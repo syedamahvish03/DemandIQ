@@ -506,59 +506,59 @@ with inventory_tab:
                         df, inventory_inputs, lookback_days=28, service_level_z=1.65,
                         demand_forecast=inventory_forecast,
                     )
-                if recommendations.empty:
-                    st.warning(
-                        "No complete inventory recommendations are available. Select the illustrative "
-                        "scenario or upload verified stock and supplier inputs."
-                    )
-                else:
-                    if inventory_mode == "Illustrative demo scenario":
-                        st.warning("SIMULATED OUTPUT — these recommendations use assumptions, not actual inventory.")
+                    if recommendations.empty:
+                        st.warning(
+                            "No complete inventory recommendations are available. Select the illustrative "
+                            "scenario or upload verified stock and supplier inputs."
+                        )
                     else:
-                        st.success("Recommendations calculated from the uploaded inventory inputs.")
-                    i1, i2, i3 = st.columns(3)
-                    i1.metric("Items evaluated", f"{len(recommendations):,}")
-                    i2.metric(
-                        "Items at/below reorder point",
-                        f"{int(recommendations['reorder_required'].sum()):,}",
-                    )
-                    i3.metric(
-                        "Total suggested units", f"{int(recommendations['recommended_order_qty'].sum()):,}"
-                    )
-                    display_columns = [
-                        "store", "item", "avg_daily_demand", "forecast_lead_demand",
-                        "forecast_protection_demand", "on_hand", "on_order", "backorders",
-                        "lead_time_days", "safety_stock", "reorder_point",
-                        "inventory_position", "target_stock", "recommended_order_qty",
-                        "reorder_required",
-                    ]
-                    st.dataframe(
-                        recommendations[display_columns].style.format({
-                            "avg_daily_demand": "{:,.2f}",
-                            "forecast_lead_demand": "{:,.1f}",
-                            "forecast_protection_demand": "{:,.1f}",
-                            "safety_stock": "{:,.1f}",
-                            "reorder_point": "{:,.1f}",
-                            "inventory_position": "{:,.1f}",
-                            "target_stock": "{:,.1f}",
-                        }),
-                        width="stretch",
-                        hide_index=True,
-                    )
-                    result_csv = recommendations.to_csv(index=False).encode("utf-8")
-                    st.download_button(
-                        "Download inventory scenario results",
-                        data=result_csv,
-                        file_name="demandiq_inventory_recommendations.csv",
-                        mime="text/csv",
-                        key="download_inventory_recommendations",
-                    )
-                    st.caption(
-                        f"Historical variability window: {inventory_metadata['demand_window_start']} to "
-                        f"{inventory_metadata['demand_window_end']}. Reorder point and target stock use "
-                        "the generated future forecast; safety stock uses historical demand variability. "
-                        "These are planning calculations, not purchase orders."
-                    )
+                        if inventory_mode == "Illustrative demo scenario":
+                            st.warning("SIMULATED OUTPUT — these recommendations use assumptions, not actual inventory.")
+                        else:
+                            st.success("Recommendations calculated from the uploaded inventory inputs.")
+                        i1, i2, i3 = st.columns(3)
+                        i1.metric("Items evaluated", f"{len(recommendations):,}")
+                        i2.metric(
+                            "Items at/below reorder point",
+                            f"{int(recommendations['reorder_required'].sum()):,}",
+                        )
+                        i3.metric(
+                            "Total suggested units", f"{int(recommendations['recommended_order_qty'].sum()):,}"
+                        )
+                        display_columns = [
+                            "store", "item", "avg_daily_demand", "forecast_lead_demand",
+                            "forecast_protection_demand", "on_hand", "on_order", "backorders",
+                            "lead_time_days", "safety_stock", "reorder_point",
+                            "inventory_position", "target_stock", "recommended_order_qty",
+                            "reorder_required",
+                        ]
+                        st.dataframe(
+                            recommendations[display_columns].style.format({
+                                "avg_daily_demand": "{:,.2f}",
+                                "forecast_lead_demand": "{:,.1f}",
+                                "forecast_protection_demand": "{:,.1f}",
+                                "safety_stock": "{:,.1f}",
+                                "reorder_point": "{:,.1f}",
+                                "inventory_position": "{:,.1f}",
+                                "target_stock": "{:,.1f}",
+                            }),
+                            width="stretch",
+                            hide_index=True,
+                        )
+                        result_csv = recommendations.to_csv(index=False).encode("utf-8")
+                        st.download_button(
+                            "Download inventory scenario results",
+                            data=result_csv,
+                            file_name="demandiq_inventory_recommendations.csv",
+                            mime="text/csv",
+                            key="download_inventory_recommendations",
+                        )
+                        st.caption(
+                            f"Historical variability window: {inventory_metadata['demand_window_start']} to "
+                            f"{inventory_metadata['demand_window_end']}. Reorder point and target stock use "
+                            "the generated future forecast; safety stock uses historical demand variability. "
+                            "These are planning calculations, not purchase orders."
+                        )
             except (ValueError, KeyError) as exc:
                 st.error(f"Could not calculate inventory recommendations: {exc}")
     except (ValueError, KeyError) as exc:
