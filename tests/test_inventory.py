@@ -100,3 +100,57 @@ def test_illustrative_inputs_reject_zero_assumption():
 
     with pytest.raises(ValueError, match="at least 1 day"):
         build_illustrative_inventory_inputs(sales_fixture(), stock_cover_days=0)
+
+
+
+def test_forecast_demand_drives_reorder_point_and_target_stock():
+    forecast = pd.DataFrame({
+        "date": list(pd.date_range("2025-01-29", periods=10, freq="D")),
+        "store": [1] * 10,
+        "item": [101] * 10,
+        "forecast_sales": [20.0] * 10,
+    })
+    result, metadata = calculate_inventory_recommendations(
+        sales_fixture(),
+        inventory_fixture(),
+        demand_forecast=forecast,
+    )
+    row = result.iloc[0]
+
+    assert row["forecast_lead_demand"] == pytest.approx(60)
+    assert row["forecast_protection_demand"] == pytest.approx(200)
+    assert row["reorder_point"] == pytest.approx(60)
+    assert row["target_stock"] == pytest.approx(200)
+    assert row["recommended_order_qty"] == 175
+    assert row["demand_basis"] == "future_forecast"
+    assert metadata["demand_basis"] == "future_forecast"
+
+
+def test_forecast_inventory_requires_full_lead_plus_review_horizon():
+    forecast = pd.DataFrame({
+        "date": pd.date_range("2025-01-29", periods=9, freq="D"),
+        "store": [1] * 9,
+        "item": [101] * 9,
+        "forecast_sales": [20.0] * 9,
+    })
+    with pytest.raises(ValueError, match="At least 10 forecast days are required"):
+        calculate_inventory_recommendations(
+            sales_fixture(),
+            inventory_fixture(),
+            demand_forecast=forecast,
+        )
+
+
+def test_forecast_inventory_rejects_duplicate_daily_predictions():
+    forecast = pd.DataFrame({
+        "date": [pd.Timestamp("2025-01-29"), pd.Timestamp("2025-01-29")],
+        "store": [1, 1],
+        "item": [101, 101],
+        "forecast_sales": [20.0, 21.0],
+    })
+    with pytest.raises(ValueError, match="one row per date"):
+        calculate_inventory_recommendations(
+            sales_fixture(),
+            inventory_fixture(),
+            demand_forecast=forecast,
+        )
