@@ -88,6 +88,7 @@ except Exception as exc:
     st.warning("Showing built-in demo data instead.")
 
 st.caption(f"**Data source:** {data_source}")
+sales_data_signature = str(pd.util.hash_pandas_object(df, index=True).sum())
 st.caption(
     "Forecast metrics below describe historical holdout performance, not predictions of future sales."
 )
@@ -440,11 +441,71 @@ with inventory_tab:
                 inventory_inputs = pd.DataFrame(columns=list(inventory_template.columns))
                 st.info("Upload a completed inventory CSV to calculate recommendations.")
 
+        st.divider()
+        st.subheader("Connect the demand forecast")
+        st.write(
+            "Generate a future forecast and use its predicted units for lead-time demand "
+            "and target stock. Historical sales variability is still used for safety stock."
+        )
+        inventory_forecast_horizon = st.selectbox(
+            "Forecast horizon for inventory planning",
+            [7, 15, 30],
+            index=2,
+            format_func=lambda days: f"{days} days",
+            key="inventory_forecast_horizon",
+        )
+        st.caption(
+            "The forecast must cover at least lead time + review period. "
+            "For example, 7 lead-time days + 7 review days requires at least a 14-day forecast."
+        )
+        if st.button("Generate demand forecast for inventory", key="generate_inventory_forecast"):
+            try:
+                with st.spinner("Training the model and generating the inventory demand forecast..."):
+                    generated_forecast, generated_metadata = forecast_future_demand(
+                        df, horizon_days=int(inventory_forecast_horizon)
+                    )
+                st.session_state["inventory_forecast_result"] = generated_forecast
+                st.session_state["inventory_forecast_metadata"] = generated_metadata
+                st.session_state["inventory_forecast_signature"] = sales_data_signature
+                st.success(
+                    f"Generated {generated_metadata['horizon_days']}-day forecast "
+                    f"for {generated_metadata['series_count']:,} store-item series."
+                )
+            except (ValueError, ImportError) as exc:
+                st.session_state.pop("inventory_forecast_result", None)
+                st.session_state.pop("inventory_forecast_metadata", None)
+                st.session_state.pop("inventory_forecast_signature", None)
+                st.error(f"Could not generate the inventory demand forecast: {exc}")
+
+        inventory_forecast = None
+        if (
+            "inventory_forecast_result" in st.session_state
+            and st.session_state.get("inventory_forecast_signature") == sales_data_signature
+        ):
+            inventory_forecast = st.session_state["inventory_forecast_result"]
+            forecast_metadata = st.session_state["inventory_forecast_metadata"]
+            st.success(
+                f"Inventory forecast ready: {forecast_metadata['forecast_start']} to "
+                f"{forecast_metadata['forecast_end']} "
+                f"({forecast_metadata['horizon_days']} days)."
+            )
+        else:
+            st.info(
+                "Generate an inventory demand forecast above before calculating "
+                "forecast-driven replenishment recommendations."
+            )
+
         if st.button("Calculate inventory recommendations", key="calculate_inventory"):
             try:
-                recommendations, inventory_metadata = calculate_inventory_recommendations(
-                    df, inventory_inputs, lookback_days=28, service_level_z=1.65
-                )
+                if inventory_forecast is None:
+                    st.warning(
+                        "Generate a demand forecast for the currently selected sales dataset first."
+                    )
+                else:
+                    recommendations, inventory_metadata = calculate_inventory_recommendations(
+                        df, inventory_inputs, lookback_days=28, service_level_z=1.65,
+                        demand_forecast=inventory_forecast,
+                    )
                 if recommendations.empty:
                     st.warning(
                         "No complete inventory recommendations are available. Select the illustrative "
@@ -465,14 +526,17 @@ with inventory_tab:
                         "Total suggested units", f"{int(recommendations['recommended_order_qty'].sum()):,}"
                     )
                     display_columns = [
-                        "store", "item", "avg_daily_demand", "on_hand", "on_order",
-                        "backorders", "lead_time_days", "safety_stock", "reorder_point",
+                        "store", "item", "avg_daily_demand", "forecast_lead_demand",
+                        "forecast_protection_demand", "on_hand", "on_order", "backorders",
+                        "lead_time_days", "safety_stock", "reorder_point",
                         "inventory_position", "target_stock", "recommended_order_qty",
                         "reorder_required",
                     ]
                     st.dataframe(
                         recommendations[display_columns].style.format({
                             "avg_daily_demand": "{:,.2f}",
+                            "forecast_lead_demand": "{:,.1f}",
+                            "forecast_protection_demand": "{:,.1f}",
                             "safety_stock": "{:,.1f}",
                             "reorder_point": "{:,.1f}",
                             "inventory_position": "{:,.1f}",
@@ -490,9 +554,10 @@ with inventory_tab:
                         key="download_inventory_recommendations",
                     )
                     st.caption(
-                        f"Demand window: {inventory_metadata['demand_window_start']} to "
-                        f"{inventory_metadata['demand_window_end']}. These are planning calculations, "
-                        "not purchase orders. Verify all inputs and supplier constraints before real use."
+                        f"Historical variability window: {inventory_metadata['demand_window_start']} to "
+                        f"{inventory_metadata['demand_window_end']}. Reorder point and target stock use "
+                        "the generated future forecast; safety stock uses historical demand variability. "
+                        "These are planning calculations, not purchase orders."
                     )
             except (ValueError, KeyError) as exc:
                 st.error(f"Could not calculate inventory recommendations: {exc}")
