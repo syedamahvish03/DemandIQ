@@ -1,0 +1,80 @@
+import pandas as pd
+import pytest
+
+from inventory import (
+    build_inventory_template,
+    calculate_inventory_recommendations,
+)
+
+
+def sales_fixture():
+    dates = pd.date_range("2025-01-01", periods=28, freq="D")
+    return pd.DataFrame({
+        "date": list(dates) * 2,
+        "store": [1] * 28 + [1] * 28,
+        "item": [101] * 28 + [102] * 28,
+        "sales": [10] * 28 + list(range(1, 29)),
+    })
+
+
+def inventory_fixture():
+    return pd.DataFrame([{
+        "store": 1, "item": 101, "on_hand": 20, "on_order": 5,
+        "backorders": 0, "lead_time_days": 3, "review_period_days": 7,
+    }])
+
+
+def test_template_creates_one_blank_row_per_store_item():
+    template = build_inventory_template(sales_fixture())
+    assert len(template) == 2
+    assert set(template.columns) == {
+        "store", "item", "on_hand", "on_order", "backorders",
+        "lead_time_days", "review_period_days",
+    }
+    assert template["on_hand"].isna().all()
+
+
+def test_inventory_math_uses_user_stock_inputs_and_recent_sales():
+    result, metadata = calculate_inventory_recommendations(
+        sales_fixture(), inventory_fixture()
+    )
+    row = result.iloc[0]
+
+    assert row["avg_daily_demand"] == pytest.approx(10)
+    assert row["daily_demand_std"] == pytest.approx(0)
+    assert row["safety_stock"] == pytest.approx(0)
+    assert row["reorder_point"] == pytest.approx(30)
+    assert row["inventory_position"] == pytest.approx(25)
+    assert row["target_stock"] == pytest.approx(100)
+    assert row["recommended_order_qty"] == 75
+    assert bool(row["reorder_required"]) is True
+    assert metadata["complete_recommendations"] == 1
+
+
+def test_incomplete_stock_inputs_are_excluded_not_guessed():
+    incomplete = inventory_fixture()
+    incomplete.loc[0, "on_hand"] = None
+    result, metadata = calculate_inventory_recommendations(sales_fixture(), incomplete)
+
+    assert result.empty
+    assert metadata["excluded_input_rows"] == 1
+
+
+def test_duplicate_inventory_pairs_are_rejected():
+    duplicate = pd.concat([inventory_fixture(), inventory_fixture()], ignore_index=True)
+    with pytest.raises(ValueError, match="one row per store-item"):
+        calculate_inventory_recommendations(sales_fixture(), duplicate)
+
+
+def test_negative_stock_values_are_rejected():
+    invalid = inventory_fixture()
+    invalid.loc[0, "on_hand"] = -1
+    with pytest.raises(ValueError, match="cannot be negative"):
+        calculate_inventory_recommendations(sales_fixture(), invalid)
+
+
+def test_zero_lead_time_is_rejected():
+    invalid = inventory_fixture()
+    invalid.loc[0, "lead_time_days"] = 0
+    with pytest.raises(ValueError, match="greater than zero"):
+        calculate_inventory_recommendations(sales_fixture(), invalid)
