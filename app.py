@@ -7,7 +7,11 @@ import streamlit as st
 from data_loader import load_sales_csv
 from eda import daily_sales, store_sales, summarize_sales_data, top_products, weekday_sales
 from forecasting import chronological_baseline_backtest, evaluate_random_forest
-from inventory import build_inventory_template, calculate_inventory_recommendations
+from inventory import (
+    build_illustrative_inventory_inputs,
+    build_inventory_template,
+    calculate_inventory_recommendations,
+)
 
 st.set_page_config(page_title="DemandIQ", page_icon="📦", layout="wide")
 
