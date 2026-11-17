@@ -95,7 +95,7 @@ st.subheader("Sales over time")
 if not daily.empty:
     st.plotly_chart(
         px.line(daily, x="date", y="sales", markers=True, title="Daily units sold"),
-        use_container_width=True,
+        width="stretch",
     )
 else:
     st.info("No sales records are available to chart.")
@@ -105,29 +105,29 @@ with left:
     st.subheader("Top products")
     st.plotly_chart(
         px.bar(products, x="item", y="sales", title="Top products by total units sold"),
-        use_container_width=True,
+        width="stretch",
     )
 with right:
     st.subheader("Sales by store")
     st.plotly_chart(
         px.bar(stores, x="store", y="sales", title="Total units sold by store"),
-        use_container_width=True,
+        width="stretch",
     )
 
 st.subheader("Average sales by weekday")
 st.plotly_chart(
     px.bar(weekdays, x="weekday", y="sales", title="Average units sold per sales record by weekday"),
-    use_container_width=True,
+    width="stretch",
 )
 
 with st.expander("Explore the data", expanded=False):
     tab1, tab2, tab3 = st.tabs(["Top products", "Store summary", "Recent records"])
     with tab1:
-        st.dataframe(products, use_container_width=True, hide_index=True)
+        st.dataframe(products, width="stretch", hide_index=True)
     with tab2:
-        st.dataframe(stores, use_container_width=True, hide_index=True)
+        st.dataframe(stores, width="stretch", hide_index=True)
     with tab3:
-        st.dataframe(df.sort_values("date", ascending=False).head(20), use_container_width=True, hide_index=True)
+        st.dataframe(df.sort_values("date", ascending=False).head(20), width="stretch", hide_index=True)
 
 st.subheader("Additional data observations")
 o1, o2, o3 = st.columns(3)
