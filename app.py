@@ -6,6 +6,7 @@ import streamlit as st
 
 from data_loader import load_sales_csv
 from eda import daily_sales, store_sales, summarize_sales_data, top_products, weekday_sales
+from forecasting import build_time_features, chronological_baseline_backtest
 
 st.set_page_config(page_title="DemandIQ", page_icon="📦", layout="wide")
 
@@ -160,6 +161,56 @@ o2.metric("Median daily units", f"{summary['median_daily_units']:,.1f}")
 o3.metric("Average units per record", f"{(summary['total_units'] / summary['rows']):,.2f}" if summary["rows"] else "0")
 
 st.caption(
-    "Demo figures are synthetic and illustrative. Weekday averages describe the uploaded records; "
-    "they are not forecasts. No machine-learning forecast or inventory recommendation is presented yet."
+    "Exploratory statistics describe the selected dataset. No machine-learning forecast or "
+    "inventory recommendation is presented yet."
 )
+
+st.divider()
+st.subheader("Day 3 — Time-series features and baseline")
+st.write(
+    "DemandIQ creates historical lag and rolling-average features separately for each store-item "
+    "series. The first benchmark compares two simple forecasting approaches before any machine-learning model."
+)
+
+@st.cache_data(show_spinner="Building time-series features and running chronological backtest...")
+def run_baseline(data: pd.DataFrame):
+    return chronological_baseline_backtest(data, holdout_days=28)
+
+try:
+    baseline_metrics, baseline_predictions, baseline_metadata = run_baseline(df)
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Backtest window", f"{baseline_metadata['holdout_start']} to {baseline_metadata['holdout_end']}")
+    m2.metric("Evaluation records", f"{baseline_metadata['test_rows']:,}")
+    m3.metric("Store-item series", f"{baseline_metadata['series_count']:,}")
+    st.caption(
+        "Evaluation method: chronological 28-day holdout with rolling one-step-ahead predictions. "
+        "Each prediction uses only earlier observed sales."
+    )
+    st.dataframe(
+        baseline_metrics.style.format({
+            "MAE": "{:,.2f}", "RMSE": "{:,.2f}",
+            "WAPE (%)": "{:.2f}", "Bias (%)": "{:.2f}",
+        }),
+        width="stretch", hide_index=True,
+    )
+    best_model = baseline_metrics.iloc[0]["model"]
+    st.success(f"Best simple baseline by WAPE on this holdout: {best_model}")
+    daily_comparison = (
+        baseline_predictions.groupby("date", as_index=False)[
+            ["actual", "seasonal_naive_7", "moving_average_7"]
+        ].sum()
+    )
+    st.plotly_chart(
+        px.line(
+            daily_comparison, x="date",
+            y=["actual", "seasonal_naive_7", "moving_average_7"],
+            title="Actual vs baseline forecasts — daily total",
+        ),
+        width="stretch",
+    )
+    st.caption(
+        "These are benchmark results, not a claim of future accuracy. The test is a rolling "
+        "one-step-ahead evaluation; a later stage will compare a machine-learning model on the same dates."
+    )
+except ValueError as exc:
+    st.warning(f"Baseline evaluation is not available for this dataset: {exc}")
