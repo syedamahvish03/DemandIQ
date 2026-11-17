@@ -30,8 +30,10 @@ def load_demo_data():
 st.title("📦 DemandIQ")
 st.caption("AI-powered retail demand forecasting and inventory intelligence")
 st.info(
-    "Explore validated retail sales history and compare forecasting approaches using a chronological "
-    "holdout. Forecasts are experimental model evaluations; inventory recommendations are not yet enabled."
+    "Explore validated sales history, compare models on a chronological historical holdout, and "
+    "calculate inventory scenarios. Important: the current forecasting section evaluates past data; "
+    "it does not yet generate future 7-, 15- or 30-day forecasts. Inventory outputs use assumptions "
+    "unless verified retailer stock and supplier inputs are uploaded."
 )
 
 uploaded = st.sidebar.file_uploader("Upload sales CSV", type=["csv"])
@@ -82,6 +84,9 @@ except Exception as exc:
     st.warning("Showing built-in demo data instead.")
 
 st.caption(f"**Data source:** {data_source}")
+st.caption(
+    "Forecast metrics below describe historical holdout performance, not predictions of future sales."
+)
 
 if quality_report is not None:
     st.subheader("Data quality report")
@@ -166,12 +171,12 @@ o2.metric("Median daily units", f"{summary['median_daily_units']:,.1f}")
 o3.metric("Average units per record", f"{(summary['total_units'] / summary['rows']):,.2f}" if summary["rows"] else "0")
 
 st.caption(
-    "Exploratory statistics describe the selected dataset. Forecasting results below are evaluated "
-    "on historical holdout dates; inventory recommendations are not yet presented."
+    "Exploratory statistics describe the selected dataset. Forecasting below is a historical "
+    "backtest, while inventory planning uses separately supplied or explicitly illustrative inputs."
 )
 
 st.divider()
-st.subheader("Day 3 — Time-series features and baseline")
+st.subheader("Forecast evaluation — Simple baselines")
 st.write(
     "DemandIQ creates historical lag and rolling-average features separately for each store-item "
     "series. The first benchmark compares two simple forecasting approaches before any machine-learning model."
@@ -181,6 +186,7 @@ st.write(
 def run_baseline(data: pd.DataFrame):
     return chronological_baseline_backtest(data, holdout_days=28)
 
+baseline_metrics = None
 try:
     baseline_metrics, baseline_predictions, baseline_metadata = run_baseline(df)
     m1, m2, m3 = st.columns(3)
@@ -222,7 +228,7 @@ except ValueError as exc:
 
 
 st.divider()
-st.subheader("Day 4 — Machine-learning model")
+st.subheader("Forecast evaluation — Random Forest model")
 st.write(
     "A Random Forest model is now evaluated against the same final 28-day chronological "
     "holdout used by the simple baselines. Training uses only dates before the holdout."
@@ -239,7 +245,11 @@ try:
     r2.metric("Evaluation records", f"{rf_metadata['test_rows']:,}")
     r3.metric("Holdout period", f"{rf_metadata['holdout_start']} to {rf_metadata['holdout_end']}")
 
-    comparison = pd.concat([baseline_metrics, rf_metrics], ignore_index=True)
+    comparison = (
+        pd.concat([baseline_metrics, rf_metrics], ignore_index=True)
+        if baseline_metrics is not None
+        else rf_metrics.copy()
+    )
     comparison = comparison.sort_values("WAPE (%)").reset_index(drop=True)
     st.subheader("Model comparison")
     st.dataframe(
@@ -273,7 +283,7 @@ except (ValueError, ImportError) as exc:
 
 
 st.divider()
-st.subheader("Day 5 — Inventory intelligence")
+st.subheader("Inventory planning — Reorder analysis")
 st.write(
     "Explore replenishment calculations using either clearly labelled illustrative assumptions "
     "or verified stock and supplier data supplied by a retailer."
