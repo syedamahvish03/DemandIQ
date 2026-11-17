@@ -130,3 +130,46 @@ def calculate_inventory_recommendations(
         "complete_recommendations": int(len(result)),
     }
     return result, metadata
+
+
+def build_illustrative_inventory_inputs(
+    sales_data: pd.DataFrame,
+    stock_cover_days: int = 7,
+    lead_time_days: int = 7,
+    review_period_days: int = 7,
+) -> pd.DataFrame:
+    """Build explicitly illustrative stock inputs from recent sales, never real stock data.
+
+    On-hand stock is assumed to equal recent average daily sales multiplied by
+    the selected stock-cover days. Incoming orders and backorders are assumed
+    to be zero. Lead time and review period are scenario assumptions.
+    """
+    if min(stock_cover_days, lead_time_days, review_period_days) < 1:
+        raise ValueError("Illustrative scenario settings must be at least 1 day.")
+    required = {"date", "store", "item", "sales"}
+    missing = required - set(sales_data.columns)
+    if missing:
+        raise ValueError("Sales data is missing columns: " + ", ".join(sorted(missing)))
+
+    sales = sales_data.loc[:, ["date", "store", "item", "sales"]].copy()
+    sales["date"] = pd.to_datetime(sales["date"], errors="coerce")
+    sales["sales"] = pd.to_numeric(sales["sales"], errors="coerce")
+    sales = sales.dropna(subset=["date", "store", "item", "sales"])
+    if sales.empty:
+        raise ValueError("No valid sales observations are available.")
+
+    end_date = sales["date"].max().normalize()
+    start_date = end_date - pd.Timedelta(days=27)
+    recent = sales.loc[sales["date"].between(start_date, end_date)]
+    averages = (
+        recent.groupby(["store", "item"])["sales"]
+        .mean()
+        .rename("avg_daily_demand")
+        .reset_index()
+    )
+    averages["on_hand"] = np.ceil(averages["avg_daily_demand"] * stock_cover_days)
+    averages["on_order"] = 0
+    averages["backorders"] = 0
+    averages["lead_time_days"] = lead_time_days
+    averages["review_period_days"] = review_period_days
+    return averages.loc[:, list(INVENTORY_COLUMNS)]
