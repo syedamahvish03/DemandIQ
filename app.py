@@ -29,7 +29,12 @@ st.info(
 )
 
 uploaded = st.sidebar.file_uploader("Upload sales CSV", type=["csv"])
-local_dataset = Path(__file__).resolve().parent / "data" / "raw" / "train.csv"
+raw_data_dir = Path(__file__).resolve().parent / "data" / "raw"
+local_dataset_candidates = [
+    raw_data_dir / "train.csv",
+    raw_data_dir / "train.csv" / "train.csv",
+]
+local_dataset = next((path for path in local_dataset_candidates if path.is_file()), None)
 
 @st.cache_data(show_spinner="Loading and validating the sales dataset...")
 def load_local_dataset(path: str, modified_time_ns: int):
@@ -44,7 +49,7 @@ try:
     if uploaded is not None:
         cleaned_df, quality_report = load_sales_csv(uploaded)
         selected_source = f"Uploaded file: {uploaded.name}"
-    elif local_dataset.is_file():
+    elif local_dataset is not None:
         cleaned_df, quality_report = load_local_dataset(
             str(local_dataset), local_dataset.stat().st_mtime_ns
         )
