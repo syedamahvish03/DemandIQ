@@ -6,7 +6,7 @@ DemandIQ is a portfolio MVP that explores retail sales, forecasts product demand
 
 ## Current status
 
-Day 1 foundation is in progress. The Streamlit dashboard includes illustrative demo data, basic CSV upload validation, summary metrics, and sales charts. It does not yet train a forecasting model or produce inventory recommendations.
+Core portfolio MVP stages include validated sales-data upload, exploratory analysis, chronological baseline and Random Forest evaluation, and inventory planning. Inventory results can run in an explicitly labelled illustrative scenario or from verified retailer-supplied stock data.
 
 ## Planned capabilities
 
@@ -82,7 +82,7 @@ The inventory section uses recent observed sales to estimate average daily deman
 - `lead_time_days`: supplier lead time in days
 - `review_period_days`: days until the next planned stock review
 
-Download the template from the app, fill it with verified values, and upload it. Blank rows are excluded rather than filled with invented stock assumptions. The calculation uses a 28-day observed-sales window and a 1.65 service-level z factor:
+Use the app's **Illustrative demo scenario** to demonstrate the calculation workflow without claiming to have real stock data. Its starting stock is derived from recent average sales multiplied by a user-selected stock-cover assumption; incoming orders and backorders are assumed to be zero, and lead time/review period are scenario settings. Alternatively, select **Upload verified inventory data** and provide actual retailer values. The blank template is only for future use with verified inventory records. The calculation uses a 28-day observed-sales window and a 1.65 service-level z factor:
 
 - Safety stock = 1.65 × daily demand standard deviation × √(lead time)
 - Reorder point = average daily demand × lead time + safety stock
@@ -90,4 +90,4 @@ Download the template from the app, fill it with verified values, and upload it.
 - Target stock = average daily demand × (lead time + review period) + safety stock
 - Suggested order quantity = max(0, target stock − inventory position), rounded up
 
-These are planning estimates, not purchase orders. Validate stock counts, supplier constraints, pack sizes, promotions and the appropriateness of the service-level assumption before acting. The starter sales dataset does not contain stock-on-hand or supplier lead-time fields.
+These are planning estimates, not purchase orders. In illustrative mode, every stock and supplier value is an assumption and results are simulated for demonstration only. Validate stock counts, supplier constraints, pack sizes, promotions and the appropriateness of the service-level assumption before acting. The starter Kaggle sales dataset does not contain stock-on-hand, purchase orders, backorders or supplier lead-time fields.
