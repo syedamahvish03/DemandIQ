@@ -271,44 +271,79 @@ except (ValueError, ImportError) as exc:
 st.divider()
 st.subheader("Day 5 — Inventory intelligence")
 st.write(
-    "Estimate reorder points and suggested order quantities from recent sales history. "
-    "You must supply actual stock, incoming orders, backorders and supplier lead times; "
-    "DemandIQ never guesses these values."
+    "Explore replenishment calculations using either clearly labelled illustrative assumptions "
+    "or verified stock and supplier data supplied by a retailer."
 )
-st.caption(
-    "Method: average and standard deviation of observed daily sales over the latest 28-day window. "
-    "Safety stock = 1.65 × daily demand standard deviation × square root of lead time. "
-    "Reorder point = lead-time demand + safety stock. Target stock covers lead time plus review period."
+st.warning(
+    "The Kaggle dataset contains sales history only. It does not contain actual stock, purchase "
+    "orders, backorders or supplier lead times. Illustrative scenario results below are simulated "
+    "for demonstration and must not be treated as real stock records or purchase advice."
 )
 
 try:
     inventory_template = build_inventory_template(df)
     template_csv = inventory_template.to_csv(index=False).encode("utf-8")
     st.download_button(
-        "Download inventory input template",
+        "Download blank inventory input template (for future real data)",
         data=template_csv,
         file_name="demandiq_inventory_inputs.csv",
         mime="text/csv",
         key="download_inventory_template",
     )
-    inventory_upload = st.file_uploader(
-        "Upload completed inventory inputs (optional)",
-        type=["csv"],
-        key="inventory_csv_upload",
-        help="Fill the downloaded template with your actual stock and supplier values, then upload it here.",
+
+    inventory_mode = st.radio(
+        "Choose inventory data mode",
+        ["Illustrative demo scenario", "Upload verified inventory data"],
+        horizontal=True,
+        key="inventory_mode",
     )
-    if inventory_upload is not None:
-        inventory_inputs = pd.read_csv(inventory_upload)
-        st.caption("Using the uploaded inventory input CSV.")
-    else:
-        st.write("Or enter the values directly below. Blank stock fields are excluded from recommendations.")
-        inventory_inputs = st.data_editor(
-            inventory_template,
-            num_rows="fixed",
-            hide_index=True,
-            width="stretch",
-            key="inventory_inputs_editor",
+
+    if inventory_mode == "Illustrative demo scenario":
+        st.info(
+            "DEMO ONLY — DemandIQ estimates a demonstration stock level from recent average sales. "
+            "Incoming orders and backorders are assumed to be zero. Lead time and review period are "
+            "scenario settings, not Kaggle data."
         )
+        a1, a2, a3 = st.columns(3)
+        with a1:
+            stock_cover_days = st.number_input(
+                "Assumed starting stock cover (days)", min_value=1, max_value=60,
+                value=7, step=1, key="demo_stock_cover",
+            )
+        with a2:
+            demo_lead_time = st.number_input(
+                "Assumed supplier lead time (days)", min_value=1, max_value=60,
+                value=7, step=1, key="demo_lead_time",
+            )
+        with a3:
+            demo_review_period = st.number_input(
+                "Assumed review period (days)", min_value=1, max_value=60,
+                value=7, step=1, key="demo_review_period",
+            )
+        inventory_inputs = build_illustrative_inventory_inputs(
+            df,
+            stock_cover_days=int(stock_cover_days),
+            lead_time_days=int(demo_lead_time),
+            review_period_days=int(demo_review_period),
+        )
+        st.caption(
+            "Assumption details: on-hand stock = recent 28-day average daily sales × "
+            f"{int(stock_cover_days)} days (rounded up); on-order = 0; backorders = 0; "
+            f"lead time = {int(demo_lead_time)} days; review period = {int(demo_review_period)} days."
+        )
+    else:
+        inventory_upload = st.file_uploader(
+            "Upload completed inventory inputs (CSV)",
+            type=["csv"],
+            key="inventory_csv_upload",
+            help="Use verified retailer stock and supplier values. Do not upload the blank template.",
+        )
+        if inventory_upload is not None:
+            inventory_inputs = pd.read_csv(inventory_upload)
+            st.caption("Using retailer-supplied inventory inputs. These values are not part of Kaggle.")
+        else:
+            inventory_inputs = pd.DataFrame(columns=list(inventory_template.columns))
+            st.info("Upload a completed inventory CSV to calculate recommendations.")
 
     if st.button("Calculate inventory recommendations", key="calculate_inventory"):
         try:
@@ -317,14 +352,14 @@ try:
             )
             if recommendations.empty:
                 st.warning(
-                    "No complete inventory recommendations yet. Enter all stock and supplier fields "
-                    "for at least one store-item row."
+                    "No complete inventory recommendations are available. Select the illustrative "
+                    "scenario or upload verified stock and supplier inputs."
                 )
             else:
-                st.success(
-                    f"Calculated {len(recommendations):,} recommendation(s). "
-                    f"{inventory_metadata['excluded_input_rows']:,} incomplete input row(s) were excluded."
-                )
+                if inventory_mode == "Illustrative demo scenario":
+                    st.warning("SIMULATED OUTPUT — these recommendations use assumptions, not actual inventory.")
+                else:
+                    st.success("Recommendations calculated from the uploaded inventory inputs.")
                 i1, i2, i3 = st.columns(3)
                 i1.metric("Items evaluated", f"{len(recommendations):,}")
                 i2.metric(
@@ -332,8 +367,7 @@ try:
                     f"{int(recommendations['reorder_required'].sum()):,}",
                 )
                 i3.metric(
-                    "Total suggested units",
-                    f"{int(recommendations['recommended_order_qty'].sum()):,}",
+                    "Total suggested units", f"{int(recommendations['recommended_order_qty'].sum()):,}"
                 )
                 display_columns = [
                     "store", "item", "avg_daily_demand", "on_hand", "on_order",
@@ -354,7 +388,7 @@ try:
                 )
                 result_csv = recommendations.to_csv(index=False).encode("utf-8")
                 st.download_button(
-                    "Download inventory recommendations",
+                    "Download inventory scenario results",
                     data=result_csv,
                     file_name="demandiq_inventory_recommendations.csv",
                     mime="text/csv",
@@ -362,9 +396,8 @@ try:
                 )
                 st.caption(
                     f"Demand window: {inventory_metadata['demand_window_start']} to "
-                    f"{inventory_metadata['demand_window_end']}. This is a transparent "
-                    "sales-history-based planning estimate, not a purchase order. Confirm supplier "
-                    "constraints, pack sizes, promotions and stock accuracy before ordering."
+                    f"{inventory_metadata['demand_window_end']}. These are planning calculations, "
+                    "not purchase orders. Verify all inputs and supplier constraints before real use."
                 )
         except (ValueError, KeyError) as exc:
             st.error(f"Could not calculate inventory recommendations: {exc}")
