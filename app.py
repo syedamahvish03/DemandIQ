@@ -1,8 +1,10 @@
+from pathlib import Path
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from data_validation import validate_sales_data
+from data_loader import load_sales_csv
 from eda import daily_sales, store_sales, summarize_sales_data, top_products, weekday_sales
 
 st.set_page_config(page_title="DemandIQ", page_icon="📦", layout="wide")
@@ -27,29 +29,46 @@ st.info(
 )
 
 uploaded = st.sidebar.file_uploader("Upload sales CSV", type=["csv"])
+local_dataset = Path(__file__).resolve().parent / "data" / "raw" / "train.csv"
+
+@st.cache_data(show_spinner="Loading and validating the sales dataset...")
+def load_local_dataset(path: str, modified_time_ns: int):
+    # The modification timestamp invalidates the cache when the local CSV changes.
+    return load_sales_csv(path)
+
 df = load_demo_data()
 data_source = "Built-in synthetic demo data"
 quality_report = None
 
-if uploaded is not None:
-    try:
-        uploaded_df = pd.read_csv(uploaded)
-        cleaned_df, quality_report = validate_sales_data(uploaded_df)
+try:
+    if uploaded is not None:
+        cleaned_df, quality_report = load_sales_csv(uploaded)
+        selected_source = f"Uploaded file: {uploaded.name}"
+    elif local_dataset.is_file():
+        cleaned_df, quality_report = load_local_dataset(
+            str(local_dataset), local_dataset.stat().st_mtime_ns
+        )
+        selected_source = "Local Kaggle training dataset (data/raw/train.csv)"
+    else:
+        cleaned_df = None
+        selected_source = None
+
+    if cleaned_df is not None:
         if quality_report["errors"]:
             for error in quality_report["errors"]:
                 st.sidebar.error(error)
-            st.warning("The uploaded file could not be used. Showing built-in demo data instead.")
+            st.warning("The selected CSV could not be used. Showing built-in demo data instead.")
         elif cleaned_df.empty:
             st.warning("No usable records were found. Showing built-in demo data instead.")
         else:
             df = cleaned_df
-            data_source = f"Uploaded file: {uploaded.name}"
+            data_source = selected_source
             st.sidebar.success("CSV loaded and validated.")
-    except Exception as exc:
-        st.sidebar.error(f"Could not read this CSV: {exc}")
-        st.warning("Showing built-in demo data instead.")
-else:
-    st.sidebar.caption("Using built-in demo data.")
+    else:
+        st.sidebar.caption("No local CSV found. Using built-in demo data.")
+except Exception as exc:
+    st.sidebar.error(f"Could not read the selected CSV: {exc}")
+    st.warning("Showing built-in demo data instead.")
 
 st.caption(f"**Data source:** {data_source}")
 
