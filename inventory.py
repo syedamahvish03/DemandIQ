@@ -29,11 +29,14 @@ def calculate_inventory_recommendations(
     inventory_data: pd.DataFrame,
     lookback_days: int = 28,
     service_level_z: float = 1.65,
+    demand_forecast: pd.DataFrame | None = None,
 ):
     """Calculate reorder points and order quantities for complete stock-input rows.
 
-    Average and standard deviation are calculated from observed daily sales per
-    store-item pair in the latest lookback window. Stock values are never inferred.
+    Historical demand statistics are calculated from the latest lookback window.
+    When a future forecast is supplied, forecast totals determine lead-time demand
+    and the lead-time-plus-review target. Historical variability still determines
+    safety stock. Stock values are never inferred.
     """
     sales_required = {"date", "store", "item", "sales"}
     missing_sales = sales_required - set(sales_data.columns)
@@ -101,17 +104,74 @@ def calculate_inventory_recommendations(
         * result["daily_demand_std"]
         * np.sqrt(result["lead_time_days"])
     )
-    result["reorder_point"] = (
-        result["avg_daily_demand"] * result["lead_time_days"]
-        + result["safety_stock"]
-    )
+
+    if demand_forecast is not None:
+        forecast_required = {"date", "store", "item", "forecast_sales"}
+        missing_forecast = forecast_required - set(demand_forecast.columns)
+        if missing_forecast:
+            raise ValueError(
+                "Demand forecast is missing columns: "
+                + ", ".join(sorted(missing_forecast))
+            )
+        forecast = demand_forecast.loc[:, list(forecast_required)].copy()
+        forecast["date"] = pd.to_datetime(forecast["date"], errors="coerce").dt.normalize()
+        forecast["forecast_sales"] = pd.to_numeric(
+            forecast["forecast_sales"], errors="coerce"
+        )
+        if forecast[["date", "store", "item", "forecast_sales"]].isna().any().any():
+            raise ValueError("Demand forecast contains invalid dates, identifiers or values.")
+        if (forecast["forecast_sales"] < 0).any():
+            raise ValueError("Forecast demand cannot be negative.")
+        if forecast.duplicated(["store", "item", "date"]).any():
+            raise ValueError("Demand forecast must contain one row per date and store-item pair.")
+
+        forecast = forecast.sort_values(["store", "item", "date"])
+        forecast_groups = {
+            key: group["forecast_sales"].to_numpy(dtype=float)
+            for key, group in forecast.groupby(["store", "item"], sort=False)
+        }
+        lead_demands = []
+        protection_demands = []
+        for row in result.itertuples(index=False):
+            key = (row.store, row.item)
+            if key not in forecast_groups:
+                raise ValueError(
+                    f"No future demand forecast is available for store {row.store}, item {row.item}."
+                )
+            values = forecast_groups[key]
+            lead_days = int(row.lead_time_days)
+            protection_days = lead_days + int(row.review_period_days)
+            if len(values) < protection_days:
+                raise ValueError(
+                    f"Forecast horizon is too short for store {row.store}, item {row.item}. "
+                    f"At least {protection_days} forecast days are required."
+                )
+            lead_demands.append(float(values[:lead_days].sum()))
+            protection_demands.append(float(values[:protection_days].sum()))
+
+        result["forecast_lead_demand"] = lead_demands
+        result["forecast_protection_demand"] = protection_demands
+        result["demand_basis"] = "future_forecast"
+        result["reorder_point"] = (
+            result["forecast_lead_demand"] + result["safety_stock"]
+        )
+        result["target_stock"] = (
+            result["forecast_protection_demand"] + result["safety_stock"]
+        )
+    else:
+        result["demand_basis"] = "historical_average"
+        result["reorder_point"] = (
+            result["avg_daily_demand"] * result["lead_time_days"]
+            + result["safety_stock"]
+        )
+        result["target_stock"] = (
+            result["avg_daily_demand"]
+            * (result["lead_time_days"] + result["review_period_days"])
+            + result["safety_stock"]
+        )
+
     result["inventory_position"] = (
         result["on_hand"] + result["on_order"] - result["backorders"]
-    )
-    result["target_stock"] = (
-        result["avg_daily_demand"]
-        * (result["lead_time_days"] + result["review_period_days"])
-        + result["safety_stock"]
     )
     result["recommended_order_qty"] = (
         result["target_stock"] - result["inventory_position"]
@@ -128,6 +188,7 @@ def calculate_inventory_recommendations(
         "demand_window_start": start_date.date(),
         "demand_window_end": end_date.date(),
         "complete_recommendations": int(len(result)),
+        "demand_basis": "future_forecast" if demand_forecast is not None else "historical_average",
     }
     return result, metadata
 
