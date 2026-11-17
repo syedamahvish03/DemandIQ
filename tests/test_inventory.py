@@ -78,3 +78,25 @@ def test_zero_lead_time_is_rejected():
     invalid.loc[0, "lead_time_days"] = 0
     with pytest.raises(ValueError, match="greater than zero"):
         calculate_inventory_recommendations(sales_fixture(), invalid)
+
+
+
+def test_illustrative_inputs_are_derived_from_sales_and_labelled_by_settings():
+    from inventory import build_illustrative_inventory_inputs
+
+    result = build_illustrative_inventory_inputs(
+        sales_fixture(), stock_cover_days=5, lead_time_days=4, review_period_days=6
+    )
+    row = result.loc[result["item"] == 101].iloc[0]
+    assert row["on_hand"] == 50
+    assert row["on_order"] == 0
+    assert row["backorders"] == 0
+    assert row["lead_time_days"] == 4
+    assert row["review_period_days"] == 6
+
+
+def test_illustrative_inputs_reject_zero_assumption():
+    from inventory import build_illustrative_inventory_inputs
+
+    with pytest.raises(ValueError, match="at least 1 day"):
+        build_illustrative_inventory_inputs(sales_fixture(), stock_cover_days=0)
