@@ -34,10 +34,10 @@ def load_demo_data():
 st.title("📦 DemandIQ")
 st.caption("AI-powered retail demand forecasting and inventory intelligence")
 st.info(
-    "Explore validated sales history, compare models on a chronological historical holdout, and "
-    "calculate inventory scenarios. Important: the current forecasting section evaluates past data; "
-    "it does not yet generate future 7-, 15- or 30-day forecasts. Inventory outputs use assumptions "
-    "unless verified retailer stock and supplier inputs are uploaded."
+    "Explore validated sales history, evaluate models on a chronological historical holdout, "
+    "generate future 7-, 15- or 30-day demand forecasts, and use forecasted demand in inventory "
+    "planning. Inventory outputs still use illustrative assumptions unless verified retailer stock "
+    "and supplier inputs are uploaded."
 )
 
 uploaded = st.sidebar.file_uploader("Upload sales CSV", type=["csv"])
