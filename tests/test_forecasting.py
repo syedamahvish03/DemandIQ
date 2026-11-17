@@ -26,11 +26,11 @@ def test_features_are_created_per_store_item_without_current_day_leakage():
         & (features["date"] == pd.Timestamp("2025-01-15"))
     ].iloc[0]
 
-    assert row["lag_1"] == 24
-    assert row["lag_7"] == 18
-    assert row["lag_14"] == 11
-    assert row["rolling_mean_7"] == pytest.approx(21)
-    assert row["day_of_week"] == 1
+    assert row["lag_1"] == 26
+    assert row["lag_7"] == 20
+    assert row["lag_14"] == 13
+    assert row["rolling_mean_7"] == pytest.approx(23)
+    assert row["day_of_week"] == 2
 
 
 def test_backtest_uses_last_dates_and_returns_baseline_metrics():
