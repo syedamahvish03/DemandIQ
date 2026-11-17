@@ -257,12 +257,18 @@ def forecast_future_demand(
     model.fit(train[feature_columns], train["sales"])
 
     forecast_rows = []
-    for (store, item), history in histories.items():
-        values = history["sales"]
-        next_date = history["last_date"] + pd.Timedelta(days=1)
-        for step in range(horizon_days):
-            current_date = next_date + pd.Timedelta(days=step)
-            feature_row = pd.DataFrame([{
+    series_keys = list(histories.keys())
+    # Predict one horizon step for all series in a single batch. This avoids
+    # thousands of tiny model.predict calls on the 500-series Kaggle dataset.
+    for step in range(horizon_days):
+        feature_rows = []
+        forecast_dates = []
+        for store, item in series_keys:
+            history = histories[(store, item)]
+            values = history["sales"]
+            current_date = history["last_date"] + pd.Timedelta(days=step + 1)
+            forecast_dates.append(current_date)
+            feature_rows.append({
                 "lag_1": values[-1],
                 "lag_7": values[-7],
                 "lag_14": values[-14],
@@ -272,16 +278,20 @@ def forecast_future_demand(
                 "month": current_date.month,
                 "day_of_month": current_date.day,
                 "year": current_date.year,
-            }])
-            prediction = max(0.0, float(model.predict(feature_row[feature_columns])[0]))
+            })
+
+        step_features = pd.DataFrame(feature_rows, columns=feature_columns)
+        step_predictions = model.predict(step_features).clip(min=0)
+        for index, (store, item) in enumerate(series_keys):
+            prediction = float(step_predictions[index])
+            histories[(store, item)]["sales"].append(prediction)
             forecast_rows.append({
-                "date": current_date,
+                "date": forecast_dates[index],
                 "store": store,
                 "item": item,
                 "forecast_sales": prediction,
                 "forecast_step": step + 1,
             })
-            values.append(prediction)
 
     forecast = pd.DataFrame(forecast_rows).sort_values(
         ["date", "store", "item"]
