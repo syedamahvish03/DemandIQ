@@ -69,3 +69,25 @@ date,store,item,sales
 Demo data is synthetic and labelled as such. Model performance will be reported only after chronological validation against a baseline. Inventory inputs such as on-hand stock and supplier lead time will be configurable or explicitly illustrative unless supplied by a dataset.
 
 See docs/PROJECT_PLAN.md and data/README.md.
+
+
+## Inventory planning inputs
+
+The inventory section uses recent observed sales to estimate average daily demand and variability. It requires a separate inventory-input CSV with these columns:
+
+- `store`, `item`: identifiers matching the sales CSV
+- `on_hand`: current physical stock
+- `on_order`: units already ordered and expected
+- `backorders`: units owed to customers
+- `lead_time_days`: supplier lead time in days
+- `review_period_days`: days until the next planned stock review
+
+Download the template from the app, fill it with verified values, and upload it. Blank rows are excluded rather than filled with invented stock assumptions. The calculation uses a 28-day observed-sales window and a 1.65 service-level z factor:
+
+- Safety stock = 1.65 × daily demand standard deviation × √(lead time)
+- Reorder point = average daily demand × lead time + safety stock
+- Inventory position = on-hand + on-order − backorders
+- Target stock = average daily demand × (lead time + review period) + safety stock
+- Suggested order quantity = max(0, target stock − inventory position), rounded up
+
+These are planning estimates, not purchase orders. Validate stock counts, supplier constraints, pack sizes, promotions and the appropriateness of the service-level assumption before acting. The starter sales dataset does not contain stock-on-hand or supplier lead-time fields.
