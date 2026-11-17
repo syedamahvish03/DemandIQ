@@ -6,7 +6,7 @@ import streamlit as st
 
 from data_loader import load_sales_csv
 from eda import daily_sales, store_sales, summarize_sales_data, top_products, weekday_sales
-from forecasting import build_time_features, chronological_baseline_backtest
+from forecasting import chronological_baseline_backtest, evaluate_random_forest
 
 st.set_page_config(page_title="DemandIQ", page_icon="📦", layout="wide")
 
@@ -214,3 +214,53 @@ try:
     )
 except ValueError as exc:
     st.warning(f"Baseline evaluation is not available for this dataset: {exc}")
+
+
+st.divider()
+st.subheader("Day 4 — Machine-learning model")
+st.write(
+    "A Random Forest model is now evaluated against the same final 28-day chronological "
+    "holdout used by the simple baselines. Training uses only dates before the holdout."
+)
+
+@st.cache_data(show_spinner="Training and evaluating the Random Forest model...")
+def run_random_forest(data: pd.DataFrame):
+    return evaluate_random_forest(data, holdout_days=28)
+
+try:
+    rf_metrics, rf_predictions, rf_metadata = run_random_forest(df)
+    r1, r2, r3 = st.columns(3)
+    r1.metric("Training records used", f"{rf_metadata['train_rows_used']:,}")
+    r2.metric("Evaluation records", f"{rf_metadata['test_rows']:,}")
+    r3.metric("Holdout period", f"{rf_metadata['holdout_start']} to {rf_metadata['holdout_end']}")
+
+    comparison = pd.concat([baseline_metrics, rf_metrics], ignore_index=True)
+    comparison = comparison.sort_values("WAPE (%)").reset_index(drop=True)
+    st.subheader("Model comparison")
+    st.dataframe(
+        comparison.style.format({
+            "MAE": "{:,.2f}", "RMSE": "{:,.2f}",
+            "WAPE (%)": "{:.2f}", "Bias (%)": "{:.2f}",
+        }),
+        width="stretch", hide_index=True,
+    )
+    best_model = comparison.iloc[0]["model"]
+    st.success(f"Best evaluated model by WAPE on this holdout: {best_model}")
+
+    rf_daily = rf_predictions.groupby("date", as_index=False)[
+        ["actual", "random_forest"]
+    ].sum()
+    st.plotly_chart(
+        px.line(
+            rf_daily, x="date", y=["actual", "random_forest"],
+            title="Actual vs Random Forest — daily total",
+        ),
+        width="stretch",
+    )
+    st.caption(
+        "The Random Forest uses a deterministic sample of at most 200,000 historical training "
+        "rows to keep execution practical. Results describe this dataset and holdout only; "
+        "they do not guarantee future forecast accuracy."
+    )
+except (ValueError, ImportError) as exc:
+    st.warning(f"Random Forest evaluation is not available: {exc}")
