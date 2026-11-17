@@ -7,6 +7,7 @@ import streamlit as st
 from data_loader import load_sales_csv
 from eda import daily_sales, store_sales, summarize_sales_data, top_products, weekday_sales
 from forecasting import chronological_baseline_backtest, evaluate_random_forest
+from inventory import build_inventory_template, calculate_inventory_recommendations
 
 st.set_page_config(page_title="DemandIQ", page_icon="📦", layout="wide")
 
@@ -264,3 +265,108 @@ try:
     )
 except (ValueError, ImportError) as exc:
     st.warning(f"Random Forest evaluation is not available: {exc}")
+
+
+
+st.divider()
+st.subheader("Day 5 — Inventory intelligence")
+st.write(
+    "Estimate reorder points and suggested order quantities from recent sales history. "
+    "You must supply actual stock, incoming orders, backorders and supplier lead times; "
+    "DemandIQ never guesses these values."
+)
+st.caption(
+    "Method: average and standard deviation of observed daily sales over the latest 28-day window. "
+    "Safety stock = 1.65 × daily demand standard deviation × square root of lead time. "
+    "Reorder point = lead-time demand + safety stock. Target stock covers lead time plus review period."
+)
+
+try:
+    inventory_template = build_inventory_template(df)
+    template_csv = inventory_template.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "Download inventory input template",
+        data=template_csv,
+        file_name="demandiq_inventory_inputs.csv",
+        mime="text/csv",
+        key="download_inventory_template",
+    )
+    inventory_upload = st.file_uploader(
+        "Upload completed inventory inputs (optional)",
+        type=["csv"],
+        key="inventory_csv_upload",
+        help="Fill the downloaded template with your actual stock and supplier values, then upload it here.",
+    )
+    if inventory_upload is not None:
+        inventory_inputs = pd.read_csv(inventory_upload)
+        st.caption("Using the uploaded inventory input CSV.")
+    else:
+        st.write("Or enter the values directly below. Blank stock fields are excluded from recommendations.")
+        inventory_inputs = st.data_editor(
+            inventory_template,
+            num_rows="fixed",
+            hide_index=True,
+            width="stretch",
+            key="inventory_inputs_editor",
+        )
+
+    if st.button("Calculate inventory recommendations", key="calculate_inventory"):
+        try:
+            recommendations, inventory_metadata = calculate_inventory_recommendations(
+                df, inventory_inputs, lookback_days=28, service_level_z=1.65
+            )
+            if recommendations.empty:
+                st.warning(
+                    "No complete inventory recommendations yet. Enter all stock and supplier fields "
+                    "for at least one store-item row."
+                )
+            else:
+                st.success(
+                    f"Calculated {len(recommendations):,} recommendation(s). "
+                    f"{inventory_metadata['excluded_input_rows']:,} incomplete input row(s) were excluded."
+                )
+                i1, i2, i3 = st.columns(3)
+                i1.metric("Items evaluated", f"{len(recommendations):,}")
+                i2.metric(
+                    "Items at/below reorder point",
+                    f"{int(recommendations['reorder_required'].sum()):,}",
+                )
+                i3.metric(
+                    "Total suggested units",
+                    f"{int(recommendations['recommended_order_qty'].sum()):,}",
+                )
+                display_columns = [
+                    "store", "item", "avg_daily_demand", "on_hand", "on_order",
+                    "backorders", "lead_time_days", "safety_stock", "reorder_point",
+                    "inventory_position", "target_stock", "recommended_order_qty",
+                    "reorder_required",
+                ]
+                st.dataframe(
+                    recommendations[display_columns].style.format({
+                        "avg_daily_demand": "{:,.2f}",
+                        "safety_stock": "{:,.1f}",
+                        "reorder_point": "{:,.1f}",
+                        "inventory_position": "{:,.1f}",
+                        "target_stock": "{:,.1f}",
+                    }),
+                    width="stretch",
+                    hide_index=True,
+                )
+                result_csv = recommendations.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "Download inventory recommendations",
+                    data=result_csv,
+                    file_name="demandiq_inventory_recommendations.csv",
+                    mime="text/csv",
+                    key="download_inventory_recommendations",
+                )
+                st.caption(
+                    f"Demand window: {inventory_metadata['demand_window_start']} to "
+                    f"{inventory_metadata['demand_window_end']}. This is a transparent "
+                    "sales-history-based planning estimate, not a purchase order. Confirm supplier "
+                    "constraints, pack sizes, promotions and stock accuracy before ordering."
+                )
+        except (ValueError, KeyError) as exc:
+            st.error(f"Could not calculate inventory recommendations: {exc}")
+except (ValueError, KeyError) as exc:
+    st.warning(f"Inventory tools are not available for this dataset: {exc}")
