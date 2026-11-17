@@ -37,7 +37,7 @@ def build_time_features(data: pd.DataFrame) -> pd.DataFrame:
     frame["rolling_mean_14"] = grouped.transform(
         lambda values: values.shift(1).rolling(window=14, min_periods=14).mean()
     )
-    frame["day_of_week"] = frame["date"].dt.dayofweek
+    frame["day_of_week"] = frame["date"].dt.day_of_week
     frame["month"] = frame["date"].dt.month
     frame["day_of_month"] = frame["date"].dt.day
     frame["year"] = frame["date"].dt.year
@@ -103,6 +103,82 @@ def chronological_baseline_backtest(data: pd.DataFrame, holdout_days: int = 28):
         "holdout_start": pd.Timestamp(test_start).date(),
         "holdout_end": predictions["date"].max().date(),
         "holdout_days_requested": int(holdout_days),
+        "test_rows": int(len(predictions)),
+        "series_count": int(predictions.groupby(["store", "item"]).ngroups),
+    }
+    return metrics, predictions, metadata
+
+
+
+def evaluate_random_forest(data: pd.DataFrame, holdout_days: int = 28, max_train_rows: int = 200_000):
+    """Evaluate a Random Forest on the same chronological holdout as the baselines.
+
+    Training rows are restricted to dates before the holdout. A deterministic
+    sample caps training size so the portfolio app remains practical on a laptop.
+    Test features use shifted historical observations, so the current target is
+    never included in its own prediction inputs.
+    """
+    if holdout_days < 1:
+        raise ValueError("holdout_days must be at least 1")
+    if max_train_rows < 1:
+        raise ValueError("max_train_rows must be at least 1")
+
+    from sklearn.ensemble import RandomForestRegressor
+
+    features = build_time_features(data)
+    if features.empty:
+        raise ValueError("No usable sales rows are available for model evaluation.")
+
+    unique_dates = pd.Index(features["date"].dt.normalize().drop_duplicates()).sort_values()
+    if len(unique_dates) <= holdout_days:
+        raise ValueError("Not enough distinct dates for the requested chronological holdout.")
+
+    test_start = unique_dates[-holdout_days]
+    feature_columns = [
+        "lag_1", "lag_7", "lag_14", "rolling_mean_7", "rolling_mean_14",
+        "day_of_week", "month", "day_of_month", "year",
+    ]
+    eligible = features.dropna(subset=feature_columns).copy()
+    train = eligible.loc[eligible["date"].dt.normalize().lt(test_start)]
+    test = eligible.loc[eligible["date"].dt.normalize().ge(test_start)].copy()
+    if train.empty or test.empty:
+        raise ValueError("Not enough historical rows to train and evaluate the model.")
+
+    if len(train) > max_train_rows:
+        train = train.sample(n=max_train_rows, random_state=42)
+
+    model = RandomForestRegressor(
+        n_estimators=100,
+        max_depth=16,
+        min_samples_leaf=3,
+        random_state=42,
+        n_jobs=-1,
+    )
+    model.fit(train[feature_columns], train["sales"])
+    predictions = test[["date", "store", "item", "sales"]].rename(
+        columns={"sales": "actual"}
+    ).copy()
+    predictions["random_forest"] = model.predict(test[feature_columns]).clip(min=0)
+
+    errors = predictions["random_forest"] - predictions["actual"]
+    total_actual = float(predictions["actual"].sum())
+    metrics = pd.DataFrame([{
+        "model": "random_forest",
+        "MAE": float(errors.abs().mean()),
+        "RMSE": float(np.sqrt(np.mean(np.square(errors)))),
+        "WAPE (%)": (
+            float(errors.abs().sum() / abs(total_actual) * 100)
+            if total_actual != 0 else float("nan")
+        ),
+        "Bias (%)": (
+            float(errors.sum() / total_actual * 100)
+            if total_actual != 0 else float("nan")
+        ),
+    }])
+    metadata = {
+        "holdout_start": pd.Timestamp(test_start).date(),
+        "holdout_end": predictions["date"].max().date(),
+        "train_rows_used": int(len(train)),
         "test_rows": int(len(predictions)),
         "series_count": int(predictions.groupby(["store", "item"]).ngroups),
     }
