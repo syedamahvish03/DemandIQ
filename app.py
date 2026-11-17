@@ -259,6 +259,13 @@ try:
         }),
         width="stretch", hide_index=True,
     )
+    st.download_button(
+        "Download model comparison (CSV)",
+        data=comparison.to_csv(index=False).encode("utf-8"),
+        file_name="demandiq_model_comparison.csv",
+        mime="text/csv",
+        key="download_model_comparison",
+    )
     best_model = comparison.iloc[0]["model"]
     st.success(f"Best evaluated model by WAPE on this holdout: {best_model}")
 
