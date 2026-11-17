@@ -15,7 +15,7 @@ Core portfolio MVP stages include validated sales-data upload, exploratory analy
 - Time-series feature engineering and baseline forecasting
 - Machine-learning model training with chronological evaluation
 - 7-, 15-, and 30-day demand forecasts
-- Reorder-point and suggested-order calculations using explicit assumptions
+- Future forecast-driven lead-time demand, reorder-point and suggested-order calculations
 - Downloadable outputs
 
 ## Technology
@@ -91,3 +91,17 @@ Use the app's **Illustrative demo scenario** to demonstrate the calculation work
 - Suggested order quantity = max(0, target stock − inventory position), rounded up
 
 These are planning estimates, not purchase orders. In illustrative mode, every stock and supplier value is an assumption and results are simulated for demonstration only. Validate stock counts, supplier constraints, pack sizes, promotions and the appropriateness of the service-level assumption before acting. The starter Kaggle sales dataset does not contain stock-on-hand, purchase orders, backorders or supplier lead-time fields.
+
+
+## Forecast-driven inventory planning
+
+In the Inventory planning tab, generate a 7-, 15- or 30-day future demand forecast before calculating recommendations. The selected forecast must cover at least the supplier lead time plus review period for each inventory row.
+
+- Forecast lead-time demand = sum of predicted daily demand over the lead-time window
+- Forecast protection-period demand = sum of predicted daily demand over lead time + review period
+- Safety stock = 1.65 × historical daily demand standard deviation × √(lead time)
+- Reorder point = forecast lead-time demand + safety stock
+- Target stock = forecast protection-period demand + safety stock
+- Suggested order quantity = max(0, target stock − inventory position), rounded up
+
+The historical demand window is still used to estimate variability for safety stock. In illustrative mode, starting stock, zero incoming orders, zero backorders, lead time and review period remain assumptions. Forecasts and resulting inventory quantities are planning demonstrations, not verified stock records or purchase advice.
