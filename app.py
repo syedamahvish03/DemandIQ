@@ -6,7 +6,11 @@ import streamlit as st
 
 from data_loader import load_sales_csv
 from eda import daily_sales, store_sales, summarize_sales_data, top_products, weekday_sales
-from forecasting import chronological_baseline_backtest, evaluate_random_forest
+from forecasting import (
+    chronological_baseline_backtest,
+    evaluate_random_forest,
+    forecast_future_demand,
+)
 from inventory import (
     build_illustrative_inventory_inputs,
     build_inventory_template,
@@ -180,7 +184,74 @@ with dashboard_tab:
         "backtest, while inventory planning uses separately supplied or explicitly illustrative inputs."
     )
 
+
 with forecast_tab:
+    st.subheader("Future demand forecast — 7, 15 or 30 days")
+    st.write(
+        "Train a forecasting model on the available sales history and generate recursive daily "
+        "predictions for every store-item series. Future values are model estimates, not actual sales."
+    )
+    horizon_days = st.selectbox(
+        "Forecast horizon",
+        [7, 15, 30],
+        index=0,
+        format_func=lambda days: f"{days} days",
+        key="future_forecast_horizon",
+    )
+    if st.button("Generate future demand forecast", key="generate_future_forecast"):
+        try:
+            with st.spinner("Training the model and generating future predictions..."):
+                future_forecast, future_metadata = forecast_future_demand(
+                    df, horizon_days=int(horizon_days)
+                )
+            st.session_state["future_forecast_result"] = future_forecast
+            st.session_state["future_forecast_metadata"] = future_metadata
+            st.session_state["future_forecast_source"] = data_source
+        except (ValueError, ImportError) as exc:
+            st.session_state.pop("future_forecast_result", None)
+            st.session_state.pop("future_forecast_metadata", None)
+            st.error(f"Future forecasting is not available: {exc}")
+
+    if "future_forecast_result" in st.session_state:
+        future_forecast = st.session_state["future_forecast_result"]
+        future_metadata = st.session_state["future_forecast_metadata"]
+        f1, f2, f3 = st.columns(3)
+        f1.metric("Forecast period", f"{future_metadata['forecast_start']} to {future_metadata['forecast_end']}")
+        f2.metric("Store-item series", f"{future_metadata['series_count']:,}")
+        f3.metric("Predicted units", f"{future_forecast['forecast_sales'].sum():,.0f}")
+        st.caption(
+            f"History ends {future_metadata['history_end']}. Model trained on "
+            f"{future_metadata['training_rows_used']:,} historical feature rows. "
+            "Forecasts are recursively generated: earlier predictions become later lag inputs."
+        )
+        future_daily = future_forecast.groupby("date", as_index=False)["forecast_sales"].sum()
+        st.plotly_chart(
+            px.line(
+                future_daily, x="date", y="forecast_sales", markers=True,
+                title="Predicted daily demand — all stores and products",
+            ),
+            width="stretch",
+        )
+        with st.expander("Explore forecast by store and product", expanded=False):
+            st.dataframe(
+                future_forecast.style.format({"forecast_sales": "{:,.2f}"}),
+                width="stretch",
+                hide_index=True,
+            )
+        st.download_button(
+            "Download future demand forecast (CSV)",
+            data=future_forecast.to_csv(index=False).encode("utf-8"),
+            file_name=f"demandiq_{future_metadata['horizon_days']}_day_forecast.csv",
+            mime="text/csv",
+            key="download_future_forecast",
+        )
+        st.warning(
+            "Forecasts are estimates based on historical sales patterns. They do not account for "
+            "promotions, holidays, price changes, stockouts or future events unless those signals "
+            "are added to the data and model."
+        )
+
+    st.divider()
     st.subheader("Forecast evaluation — Simple baselines")
     st.write(
         "DemandIQ creates historical lag and rolling-average features separately for each store-item "
