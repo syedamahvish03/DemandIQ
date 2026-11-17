@@ -183,3 +183,116 @@ def evaluate_random_forest(data: pd.DataFrame, holdout_days: int = 28, max_train
         "series_count": int(predictions.groupby(["store", "item"]).ngroups),
     }
     return metrics, predictions, metadata
+
+
+def forecast_future_demand(
+    data: pd.DataFrame,
+    horizon_days: int = 7,
+    max_train_rows: int = 200_000,
+):
+    """Train on all available history and recursively forecast future daily sales.
+
+    The model uses the same leakage-safe lag and rolling features as evaluation.
+    Future lag values are populated with earlier model predictions, never future
+    actuals. Input must contain one observation per calendar day for each series.
+    """
+    if horizon_days not in (7, 15, 30):
+        raise ValueError("horizon_days must be one of 7, 15 or 30.")
+    if max_train_rows < 1:
+        raise ValueError("max_train_rows must be at least 1.")
+
+    from sklearn.ensemble import RandomForestRegressor
+
+    features = build_time_features(data)
+    if features.empty:
+        raise ValueError("No usable sales rows are available for forecasting.")
+
+    frame = data.loc[:, list(REQUIRED_COLUMNS)].copy()
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
+    frame["sales"] = pd.to_numeric(frame["sales"], errors="coerce")
+    frame = frame.dropna(subset=["date", "store", "item", "sales"])
+    if frame.duplicated(["store", "item", "date"]).any():
+        raise ValueError(
+            "Future forecasting requires one sales row per date, store and item. "
+            "Aggregate duplicate daily records before forecasting."
+        )
+
+    feature_columns = [
+        "lag_1", "lag_7", "lag_14", "rolling_mean_7", "rolling_mean_14",
+        "day_of_week", "month", "day_of_month", "year",
+    ]
+    eligible = features.dropna(subset=feature_columns).copy()
+    if eligible.empty:
+        raise ValueError("At least 15 daily observations per store-item series are required.")
+
+    histories = {}
+    for (store, item), group in frame.groupby(["store", "item"], sort=False):
+        group = group.sort_values("date")
+        dates = group["date"].reset_index(drop=True)
+        if len(dates) < 15:
+            raise ValueError(
+                f"Store {store}, item {item} has fewer than 15 daily observations."
+            )
+        if dates.diff().dropna().ne(pd.Timedelta(days=1)).any():
+            raise ValueError(
+                f"Store {store}, item {item} has missing or irregular dates. "
+                "Provide a complete daily series before forecasting."
+            )
+        histories[(store, item)] = {
+            "sales": group["sales"].astype(float).tolist(),
+            "last_date": dates.iloc[-1],
+        }
+
+    train = eligible
+    if len(train) > max_train_rows:
+        train = train.sample(n=max_train_rows, random_state=42)
+
+    model = RandomForestRegressor(
+        n_estimators=100,
+        max_depth=16,
+        min_samples_leaf=3,
+        random_state=42,
+        n_jobs=-1,
+    )
+    model.fit(train[feature_columns], train["sales"])
+
+    forecast_rows = []
+    for (store, item), history in histories.items():
+        values = history["sales"]
+        next_date = history["last_date"] + pd.Timedelta(days=1)
+        for step in range(horizon_days):
+            current_date = next_date + pd.Timedelta(days=step)
+            feature_row = pd.DataFrame([{
+                "lag_1": values[-1],
+                "lag_7": values[-7],
+                "lag_14": values[-14],
+                "rolling_mean_7": float(np.mean(values[-7:])),
+                "rolling_mean_14": float(np.mean(values[-14:])),
+                "day_of_week": current_date.day_of_week,
+                "month": current_date.month,
+                "day_of_month": current_date.day,
+                "year": current_date.year,
+            }])
+            prediction = max(0.0, float(model.predict(feature_row[feature_columns])[0]))
+            forecast_rows.append({
+                "date": current_date,
+                "store": store,
+                "item": item,
+                "forecast_sales": prediction,
+                "forecast_step": step + 1,
+            })
+            values.append(prediction)
+
+    forecast = pd.DataFrame(forecast_rows).sort_values(
+        ["date", "store", "item"]
+    ).reset_index(drop=True)
+    metadata = {
+        "horizon_days": int(horizon_days),
+        "series_count": int(len(histories)),
+        "forecast_rows": int(len(forecast)),
+        "training_rows_used": int(len(train)),
+        "history_end": frame["date"].max().date(),
+        "forecast_start": forecast["date"].min().date(),
+        "forecast_end": forecast["date"].max().date(),
+    }
+    return forecast, metadata
