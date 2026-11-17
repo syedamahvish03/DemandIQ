@@ -1,7 +1,11 @@
 import pandas as pd
 import pytest
 
-from forecasting import build_time_features, chronological_baseline_backtest
+from forecasting import (
+    build_time_features,
+    chronological_baseline_backtest,
+    evaluate_random_forest,
+)
 
 
 def sample_daily_sales(days=50):
@@ -53,3 +57,22 @@ def test_backtest_rejects_too_short_history():
 def test_feature_builder_rejects_missing_columns():
     with pytest.raises(ValueError, match="Missing required columns"):
         build_time_features(pd.DataFrame({"date": ["2025-01-01"]}))
+
+
+def test_random_forest_uses_chronological_holdout_and_returns_metrics():
+    metrics, predictions, metadata = evaluate_random_forest(
+        sample_daily_sales(), holdout_days=7, max_train_rows=100
+    )
+
+    assert metrics.loc[0, "model"] == "random_forest"
+    assert len(predictions) == 7 * 4
+    assert metadata["test_rows"] == 28
+    assert metadata["train_rows_used"] <= 100
+    assert metadata["holdout_start"].isoformat() == "2025-02-13"
+    assert predictions["random_forest"].ge(0).all()
+    assert metrics[["MAE", "RMSE", "WAPE (%)", "Bias (%)"]].notna().all().all()
+
+
+def test_random_forest_rejects_invalid_training_cap():
+    with pytest.raises(ValueError, match="max_train_rows"):
+        evaluate_random_forest(sample_daily_sales(), holdout_days=7, max_train_rows=0)
