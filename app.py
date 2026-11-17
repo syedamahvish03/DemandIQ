@@ -25,8 +25,8 @@ def load_demo_data():
 st.title("📦 DemandIQ")
 st.caption("AI-powered retail demand forecasting and inventory intelligence")
 st.info(
-    "Exploratory analysis: review sales history, product and store performance, and weekday patterns. "
-    "Forecasting models will be added only after the data has been explored and validated."
+    "Explore validated retail sales history and compare forecasting approaches using a chronological "
+    "holdout. Forecasts are experimental model evaluations; inventory recommendations are not yet enabled."
 )
 
 uploaded = st.sidebar.file_uploader("Upload sales CSV", type=["csv"])
@@ -161,8 +161,8 @@ o2.metric("Median daily units", f"{summary['median_daily_units']:,.1f}")
 o3.metric("Average units per record", f"{(summary['total_units'] / summary['rows']):,.2f}" if summary["rows"] else "0")
 
 st.caption(
-    "Exploratory statistics describe the selected dataset. No machine-learning forecast or "
-    "inventory recommendation is presented yet."
+    "Exploratory statistics describe the selected dataset. Forecasting results below are evaluated "
+    "on historical holdout dates; inventory recommendations are not yet presented."
 )
 
 st.divider()
