@@ -37,6 +37,19 @@ def make_sales_csv(days: int = 50) -> bytes:
     return frame.to_csv(index=False).encode("utf-8")
 
 
+def make_inventory_csv(lead_time_days: int = 3, review_period_days: int = 7) -> bytes:
+    frame = pd.DataFrame([{
+        "store": 1,
+        "item": 101,
+        "on_hand": 50,
+        "on_order": 0,
+        "backorders": 0,
+        "lead_time_days": lead_time_days,
+        "review_period_days": review_period_days,
+    }])
+    return frame.to_csv(index=False).encode("utf-8")
+
+
 def test_forecast_endpoint_returns_real_model_predictions():
     response = client.post(
         "/api/v1/forecasts",
@@ -83,3 +96,55 @@ def test_forecast_endpoint_reports_invalid_csv_columns():
     )
     assert response.status_code == 422
     assert "quality_report" in response.json()["detail"]
+
+
+def test_inventory_recommendations_use_future_demand_forecast():
+    response = client.post(
+        "/api/v1/inventory/recommendations",
+        files={
+            "sales_file": ("sales.csv", BytesIO(make_sales_csv()), "text/csv"),
+            "inventory_file": ("inventory.csv", BytesIO(make_inventory_csv()), "text/csv"),
+        },
+        data={"forecast_horizon_days": "15"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["demand_basis"] == "future_forecast"
+    assert payload["metadata"]["forecast_horizon_days"] == 15
+    assert payload["metadata"]["forecast_rows"] == 15
+    assert len(payload["recommendations"]) == 1
+    recommendation = payload["recommendations"][0]
+    assert recommendation["demand_basis"] == "future_forecast"
+    assert recommendation["forecast_lead_demand"] >= 0
+    assert recommendation["forecast_protection_demand"] >= recommendation["forecast_lead_demand"]
+    assert recommendation["recommended_order_qty"] >= 0
+
+
+def test_inventory_recommendations_reject_insufficient_forecast_horizon():
+    response = client.post(
+        "/api/v1/inventory/recommendations",
+        files={
+            "sales_file": ("sales.csv", BytesIO(make_sales_csv()), "text/csv"),
+            "inventory_file": ("inventory.csv", BytesIO(make_inventory_csv()), "text/csv"),
+        },
+        data={"forecast_horizon_days": "7"},
+    )
+
+    assert response.status_code == 422
+    assert "Forecast horizon is too short" in response.json()["detail"]
+
+
+def test_inventory_recommendations_reject_unsupported_forecast_horizon():
+    response = client.post(
+        "/api/v1/inventory/recommendations",
+        files={
+            "sales_file": ("sales.csv", BytesIO(make_sales_csv()), "text/csv"),
+            "inventory_file": ("inventory.csv", BytesIO(make_inventory_csv()), "text/csv"),
+        },
+        data={"forecast_horizon_days": "10"},
+    )
+
+    assert response.status_code == 422
+    assert "7, 15 or 30" in response.json()["detail"]
