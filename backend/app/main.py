@@ -3,12 +3,15 @@ import logging
 import os
 from io import BytesIO
 
+from fastapi.responses import Response
+
 import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from data_validation import validate_sales_data
 from forecasting import forecast_future_demand
+from inventory import INVENTORY_COLUMNS, build_inventory_template, calculate_inventory_recommendations
 
 logger = logging.getLogger(__name__)
 
@@ -127,4 +130,100 @@ async def create_forecast(
         },
         "quality_report": quality_report,
         "forecast": forecast_records.to_dict(orient="records"),
+    }
+
+
+def _read_csv_upload(raw_bytes: bytes, label: str) -> pd.DataFrame:
+    """Parse a bounded CSV upload and return a clear client-facing error."""
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail=f"The {label} CSV file is empty.")
+    if len(raw_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"The {label} CSV exceeds the 10 MB upload limit.")
+    try:
+        frame = pd.read_csv(BytesIO(raw_bytes))
+    except (UnicodeDecodeError, pd.errors.ParserError, pd.errors.EmptyDataError):
+        raise HTTPException(
+            status_code=400,
+            detail=f"The {label} file could not be read as a valid CSV. Check its encoding and formatting.",
+        ) from None
+    frame.columns = [str(column).strip().lower() for column in frame.columns]
+    return frame
+
+
+@app.post("/api/v1/inventory/template", tags=["Inventory"])
+async def create_inventory_template(
+    sales_file: UploadFile = File(..., description="Validated historical sales CSV"),
+) -> Response:
+    """Create a blank stock-input template for the store-item pairs in sales history."""
+    if not (sales_file.filename or "").lower().endswith(".csv"):
+        raise HTTPException(status_code=415, detail="Please upload a sales CSV file.")
+    sales_raw = await sales_file.read(MAX_UPLOAD_BYTES + 1)
+    sales_frame = _read_csv_upload(sales_raw, "sales")
+    cleaned_sales, quality_report = validate_sales_data(sales_frame)
+    if quality_report["errors"]:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "The sales file did not pass data validation.", "quality_report": quality_report},
+        )
+    template = build_inventory_template(cleaned_sales)
+    csv_content = template.to_csv(index=False)
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="demandiq_inventory_template.csv"'},
+    )
+
+
+@app.post("/api/v1/inventory/recommendations", tags=["Inventory"])
+async def create_inventory_recommendations(
+    sales_file: UploadFile = File(..., description="Historical daily sales CSV"),
+    inventory_file: UploadFile = File(..., description="Completed inventory-input CSV"),
+    lookback_days: int = Form(28),
+    service_level_z: float = Form(1.65),
+) -> dict:
+    """Calculate reorder guidance using explicit retailer-provided stock inputs."""
+    for upload, label in ((sales_file, "sales"), (inventory_file, "inventory")):
+        if not (upload.filename or "").lower().endswith(".csv"):
+            raise HTTPException(status_code=415, detail=f"Please upload a {label} CSV file.")
+
+    sales_raw = await sales_file.read(MAX_UPLOAD_BYTES + 1)
+    inventory_raw = await inventory_file.read(MAX_UPLOAD_BYTES + 1)
+    sales_frame = _read_csv_upload(sales_raw, "sales")
+    inventory_frame = _read_csv_upload(inventory_raw, "inventory")
+
+    cleaned_sales, quality_report = validate_sales_data(sales_frame)
+    if quality_report["errors"]:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "The sales file did not pass data validation.", "quality_report": quality_report},
+        )
+
+    missing_inventory_columns = sorted(set(INVENTORY_COLUMNS) - set(inventory_frame.columns))
+    if missing_inventory_columns:
+        raise HTTPException(
+            status_code=422,
+            detail="Inventory CSV is missing required columns: " + ", ".join(missing_inventory_columns),
+        )
+
+    try:
+        recommendations, metadata = calculate_inventory_recommendations(
+            cleaned_sales,
+            inventory_frame.loc[:, list(INVENTORY_COLUMNS)],
+            lookback_days=lookback_days,
+            service_level_z=service_level_z,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+
+    metadata = {
+        key: value.isoformat() if hasattr(value, "isoformat") else value
+        for key, value in metadata.items()
+    }
+    records = recommendations.astype(object).where(pd.notna(recommendations), None).to_dict(orient="records")
+    return {
+        "status": "success",
+        "demand_basis": "historical_average",
+        "metadata": metadata,
+        "sales_quality_report": quality_report,
+        "recommendations": records,
     }
