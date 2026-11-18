@@ -11,7 +11,7 @@ export function downloadCsv(
 ): void {
   const escapeCell = (value: CsvCell): string => {
     const raw = value === null || value === undefined ? "" : String(value);
-    const safe = /^[\s]*[=+@-]/.test(raw) ? `'${raw}` : raw;
+    const safe = typeof value === "string" && /^[\s]*[=+@-]/.test(raw) ? `'${raw}` : raw;
     return `"${safe.replace(/"/g, '""')}"`;
   };
 
