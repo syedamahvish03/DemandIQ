@@ -169,3 +169,21 @@ def test_recursive_multi_horizon_backtest_rejects_invalid_training_cap():
 
     with pytest.raises(ValueError, match="max_train_rows"):
         recursive_multi_horizon_backtest(sample_daily_sales(days=60), max_train_rows=0)
+
+
+def test_recursive_multi_horizon_predictions_do_not_use_holdout_actuals():
+    from forecasting import recursive_multi_horizon_backtest
+
+    source = sample_daily_sales(days=60)
+    changed_holdout = source.copy()
+    final_date = changed_holdout["date"].max()
+    changed_holdout.loc[changed_holdout["date"] > final_date - pd.Timedelta(days=30), "sales"] += 10_000
+
+    _, original_predictions, _ = recursive_multi_horizon_backtest(source)
+    _, changed_predictions, _ = recursive_multi_horizon_backtest(changed_holdout)
+
+    comparison_columns = ["date", "store", "item", "model", "forecast_step", "prediction"]
+    pd.testing.assert_frame_equal(
+        original_predictions[comparison_columns],
+        changed_predictions[comparison_columns],
+    )
