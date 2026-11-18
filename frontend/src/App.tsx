@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { checkApiHealth } from "./lib/api";
 import { Link, Route, Routes } from "react-router-dom";
 import {
   ArrowDownRight, ArrowRight, BarChart3, Boxes, Check,
@@ -81,6 +82,36 @@ const features = [
   { icon: <BarChart3 />, number: "04", title: "Turn data into decisions", body: "Translate sales patterns into clear product-level insights and reports your team can act on." }
 ];
 
+
+function ApiConnectionStatus() {
+  const [status, setStatus] = useState<"checking" | "connected" | "offline">("checking");
+
+  useEffect(() => {
+    let active = true;
+    checkApiHealth()
+      .then(() => {
+        if (active) setStatus("connected");
+      })
+      .catch(() => {
+        if (active) setStatus("offline");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const label = status === "connected"
+    ? "API connected"
+    : status === "offline"
+      ? "API unavailable"
+      : "Checking API";
+
+  return <span className={`api-status api-status-${status}`} role="status">
+    <i aria-hidden="true" />{label}
+  </span>;
+}
+
 function HomePage() {
   return <>
     <Header />
@@ -112,7 +143,7 @@ function HomePage() {
       <section className="security-section" id="security"><div className="container security-card"><div className="security-icon"><LockKeyhole size={25}/></div><div><div className="eyebrow">YOUR BUSINESS, YOUR WORKSPACE</div><h2>Private by design.<br/><span>Built with care.</span></h2><p>DemandIQ is being built around individual business workspaces, with access controls designed to keep each retailer’s information separate. Account security and workspace isolation will be connected before customer data is stored.</p></div><div className="security-points"><span><ShieldCheck/> Workspace-level data boundaries</span><span><LockKeyhole/> Protected account access</span><span><CircleHelp/> Clear data and model explanations</span></div></div></section>
       <section className="cta-section" id="about"><div className="container cta-inner"><div className="eyebrow">MAKE YOUR NEXT DECISION A CLEARER ONE</div><h2>Start with your data.<br/><span>Move with insight.</span></h2><p>Explore a more thoughtful way to understand retail demand.</p><Link className="button button-primary button-large" to="/signup">Get started with DemandIQ <ArrowRight size={17}/></Link><small>Account creation is part of the next development stage. This preview does not create or store accounts yet.</small></div></section>
     </main>
-    <footer className="site-footer"><div className="container footer-inner"><Brand/><span>Retail clarity, ahead of demand.</span><div><a href="#platform">Platform</a><a href="#security">Security</a><a href="mailto:hello@demandiq.app">Contact</a></div><small>© 2026 DemandIQ. Product preview.</small></div></footer>
+    <footer className="site-footer"><div className="container footer-inner"><Brand/><span>Retail clarity, ahead of demand.</span><div><a href="#platform">Platform</a><a href="#security">Security</a><a href="mailto:hello@demandiq.app">Contact</a></div><ApiConnectionStatus/><small>© 2026 DemandIQ. Product preview.</small></div></footer>
   </>;
 }
 
