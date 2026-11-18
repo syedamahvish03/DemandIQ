@@ -359,6 +359,7 @@ def recursive_multi_horizon_backtest(
         raise ValueError("At least 30 distinct dates are required for multi-horizon backtesting.")
     holdout_start = holdout_dates[0]
 
+    model_names = ("seasonal_naive_7", "moving_average_7", "random_forest")
     histories = {}
     for key, group in series_groups:
         dates = pd.DatetimeIndex(group["date"])
@@ -382,9 +383,14 @@ def recursive_multi_horizon_backtest(
             raise ValueError(
                 f"Store {key[0]}, item {key[1]} has insufficient pre-holdout history."
             )
+        initial_history = train_group["sales"].astype(float).tolist()
         histories[key] = {
-            "sales": train_group["sales"].astype(float).tolist(),
-            "actuals": group.loc[group["date"].isin(holdout_dates), "sales"].astype(float).tolist(),
+            "actuals": group.loc[
+                group["date"].isin(holdout_dates), "sales"
+            ].astype(float).tolist(),
+            "model_histories": {
+                model_name: list(initial_history) for model_name in model_names
+            },
         }
 
     feature_columns = [
@@ -414,7 +420,7 @@ def recursive_multi_horizon_backtest(
     for step, forecast_date in enumerate(holdout_dates, start=1):
         rf_features = []
         for key in series_keys:
-            values = histories[key]["sales"]
+            values = histories[key]["model_histories"]["random_forest"]
             rf_features.append({
                 "lag_1": values[-1],
                 "lag_7": values[-7],
@@ -431,16 +437,17 @@ def recursive_multi_horizon_backtest(
         ).clip(min=0)
 
         for index, key in enumerate(series_keys):
-            history = histories[key]["sales"]
-            actual = histories[key]["actuals"][step - 1]
-            seasonal_prediction = float(history[-7])
-            moving_average_prediction = float(np.mean(history[-7:]))
-            rf_prediction = float(rf_values[index])
-            for model_name, prediction in (
-                ("seasonal_naive_7", seasonal_prediction),
-                ("moving_average_7", moving_average_prediction),
-                ("random_forest", rf_prediction),
-            ):
+            series = histories[key]
+            seasonal_history = series["model_histories"]["seasonal_naive_7"]
+            average_history = series["model_histories"]["moving_average_7"]
+            rf_history = series["model_histories"]["random_forest"]
+            step_predictions = {
+                "seasonal_naive_7": float(seasonal_history[-7]),
+                "moving_average_7": float(np.mean(average_history[-7:])),
+                "random_forest": float(rf_values[index]),
+            }
+            actual = series["actuals"][step - 1]
+            for model_name, prediction in step_predictions.items():
                 prediction_rows.append({
                     "date": forecast_date,
                     "store": key[0],
@@ -450,30 +457,7 @@ def recursive_multi_horizon_backtest(
                     "prediction": prediction,
                     "forecast_step": step,
                 })
-            # Each model must carry forward its own predictions, not actuals.
-            histories[key].setdefault("seasonal_naive_7", []).append(seasonal_prediction)
-            histories[key].setdefault("moving_average_7", []).append(moving_average_prediction)
-            histories[key].setdefault("random_forest", []).append(rf_prediction)
-            # Keep independent histories for the next recursive step.
-            if step == 1:
-                histories[key]["model_histories"] = {
-                    name: list(history) for name, history in (
-                        ("seasonal_naive_7", history),
-                        ("moving_average_7", history),
-                        ("random_forest", history),
-                    )
-                }
-            for model_name, prediction in (
-                ("seasonal_naive_7", seasonal_prediction),
-                ("moving_average_7", moving_average_prediction),
-                ("random_forest", rf_prediction),
-            ):
-                histories[key]["model_histories"][model_name].append(prediction)
-
-        # The shared base history is not updated with actual holdout sales.
-        # Model-specific recursive histories are used below for the next step.
-        for key in series_keys:
-            histories[key]["sales"] = histories[key]["model_histories"]["random_forest"]
+                series["model_histories"][model_name].append(prediction)
 
     predictions = pd.DataFrame(prediction_rows)
     metric_rows = []
