@@ -74,11 +74,12 @@ the frontend runs at a different address. Do not use a wildcard in production.
 
 ## Current boundary
 
-This stage connects the React forecast page to the existing Python forecasting
-engine. It does not yet provide authentication, Supabase persistence, tenant
-isolation, saved forecast history, or inventory API endpoints. Do not upload
-private customer information to this development endpoint; authentication and
-workspace access controls are not yet implemented.
+The forecast and inventory endpoints connect the React workspace to the existing
+Python forecasting and inventory engines. The workflow is stateless: uploaded
+files are processed for the request and are not persisted. Authentication,
+Supabase persistence, tenant isolation, saved forecast history, and durable
+product records are not implemented yet. Do not upload private customer
+information; workspace access controls are not yet implemented.
 
 
 ## Inventory planning API
@@ -86,6 +87,6 @@ workspace access controls are not yet implemented.
 The inventory workflow is stateless in this development stage: uploaded files are processed for the request and are not persisted.
 
 - `POST /api/v1/inventory/template`: upload a validated sales CSV as `sales_file`; returns a blank CSV with one row per store-item pair and the columns `store,item,on_hand,on_order,backorders,lead_time_days,review_period_days`.
-- `POST /api/v1/inventory/recommendations`: upload the sales CSV as `sales_file` and the completed stock-input CSV as `inventory_file`. Optional form fields are `lookback_days` (default 28) and `service_level_z` (default 1.65).
+- `POST /api/v1/inventory/recommendations`: upload the sales CSV as `sales_file` and the completed stock-input CSV as `inventory_file`. Optional form fields are `lookback_days` (default 28), `service_level_z` (default 1.65), and `forecast_horizon_days` (default 15; allowed values 7, 15, or 30).
 
-Inventory recommendations use the existing `inventory.py` calculations and the latest historical sales window. They require explicit stock, incoming-order, backorder, lead-time, and review-period inputs. The API does not infer actual stock values, create purchase orders, or save uploaded data. This endpoint currently uses historical-average demand; forecast-driven replenishment can be added after the core workflow is verified.
+The recommendations endpoint generates a Random Forest demand forecast from the uploaded sales history and passes it to the existing `inventory.py` calculation. Forecast totals determine demand during supplier lead time and the lead-time-plus-review protection period. Historical demand variability is still used for safety stock. The selected forecast horizon must cover each product's lead time plus review period; for example, 3 lead-time days plus 7 review days requires at least 10 forecast days, so select 15 or 30. The workflow requires explicit stock, incoming-order, backorder, lead-time, and review-period inputs. It does not infer actual stock values, create purchase orders, or save uploaded data.
