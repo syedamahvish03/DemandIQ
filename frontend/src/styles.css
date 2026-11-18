@@ -13,3 +13,48 @@
 .api-status-offline i{background:#e49a70}
 .api-status-checking i{background:#a5afc2}
 @media(max-width:700px){.api-status{width:100%;justify-content:center;padding-top:5px}}
+
+.forecast-page{min-height:100vh;background:#f5f7fb;padding:38px 20px 80px;color:#172033}
+.forecast-container{width:min(900px,100%);margin:0 auto}
+.forecast-back{display:inline-flex;align-items:center;gap:8px;color:#66738b;font-size:12px;font-weight:600}
+.forecast-heading{margin:42px 0 27px}
+.forecast-eyebrow{display:inline-flex;align-items:center;gap:7px;color:#647be0;font-size:9px;font-weight:800;letter-spacing:1.4px}
+.forecast-heading h1{font:800 clamp(30px,5vw,43px)/1.15 Manrope,sans-serif;letter-spacing:-1.8px;margin:12px 0}
+.forecast-heading p{max-width:650px;color:#6e798d;font-size:13px;line-height:1.8}
+.forecast-card,.forecast-results{background:#fff;border:1px solid #e5e9f1;border-radius:14px;padding:27px;box-shadow:0 8px 28px #1b2b4d08}
+.forecast-field-label{display:block;color:#344158;font-size:11px;font-weight:700;margin-bottom:10px}
+.forecast-upload{min-height:155px;border:1.5px dashed #cbd3e3;border-radius:10px;background:#fafbfe;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;color:#667ee0;cursor:pointer;text-align:center;padding:20px}
+.forecast-upload strong{font-size:13px;color:#344158;max-width:100%;overflow-wrap:anywhere}
+.forecast-upload span{font-size:10px;color:#8a95a8}
+.forecast-upload input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.forecast-field{margin-top:23px}
+.forecast-field select{width:100%;height:43px;border:1px solid #dfe4ed;border-radius:8px;background:white;padding:0 12px;color:#344158;font:inherit;font-size:12px}
+.forecast-format-note{display:flex;align-items:flex-start;gap:10px;background:#f1f4ff;border-radius:8px;padding:13px;margin-top:20px;color:#66749a;font-size:10px;line-height:1.7}
+.forecast-format-note svg{flex:none;color:#657ee5}
+.forecast-format-note b{color:#3b4d80}
+.forecast-submit{width:100%;min-height:46px;margin-top:22px;font-size:12px}
+.forecast-submit:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.forecast-error{margin-top:16px;padding:12px 14px;background:#fff1ed;border:1px solid #f2d1c7;color:#9b4936;border-radius:8px;font-size:11px;line-height:1.6}
+.forecast-spinner{animation:forecast-spin 1s linear infinite}
+@keyframes forecast-spin{to{transform:rotate(360deg)}}
+.forecast-results{margin-top:22px}
+.forecast-result-heading{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}
+.forecast-result-heading h2{font:700 21px Manrope;margin:7px 0 0}
+.forecast-success{font-size:10px;color:#26845d;background:#eaf8f1;padding:8px 11px;border-radius:20px}
+.forecast-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:22px}
+.forecast-stats>div{background:#f6f8fc;border:1px solid #edf0f5;border-radius:8px;padding:13px}
+.forecast-stats small{display:block;color:#8290a6;font-size:8px;letter-spacing:.7px}
+.forecast-stats strong{display:block;color:#27354e;font:700 15px Manrope;margin-top:7px;overflow-wrap:anywhere}
+.forecast-quality{margin-top:19px;padding:14px;border:1px solid #e6ebf3;border-radius:8px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;font-size:10px;color:#69758a}
+.forecast-quality b{color:#344158}
+.forecast-quality p{width:100%;margin:0;color:#98633b;line-height:1.5}
+.forecast-table-wrap{margin-top:22px;overflow-x:auto}
+.forecast-table-title{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px;font-size:11px}
+.forecast-table-title span,.forecast-table-note{color:#8490a3;font-size:9px}
+.forecast-table{width:100%;border-collapse:collapse;font-size:10px;text-align:left;white-space:nowrap}
+.forecast-table th{background:#f5f7fb;color:#68758b;font-size:9px;letter-spacing:.4px}
+.forecast-table th,.forecast-table td{padding:11px 12px;border-bottom:1px solid #edf0f5}
+.forecast-table td:last-child{text-align:right;font-weight:700}
+.forecast-table-note{margin-top:10px}
+.forecast-disclaimer{margin:18px 0 0;color:#8b95a7;font-size:9px;line-height:1.7}
+@media(max-width:650px){.forecast-page{padding:24px 15px 55px}.forecast-heading{margin-top:32px}.forecast-card,.forecast-results{padding:18px}.forecast-stats{grid-template-columns:repeat(2,1fr)}.forecast-result-heading h2{font-size:18px}}
