@@ -79,3 +79,13 @@
 .forecast-select:focus{border-color:#7189f5;box-shadow:0 0 0 3px #7189f51b}
 .inventory-horizon-help{margin:9px 0 0;color:#7c879b;font-size:10px;line-height:1.65}
 .inventory-table{min-width:980px}
+
+
+/* Workspace result actions and responsive data exports */
+.forecast-result-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.data-export-button{min-height:34px;padding:8px 11px;border:1px solid #dfe5f0;background:#fff;color:#465675;font-size:10px}
+.data-export-button:hover{border-color:#9aabef;background:#f7f8ff}
+.data-export-button svg{color:#657ee5;flex:none}
+.forecast-table-title>div{display:grid;gap:4px}
+.forecast-table-title>div span{color:#8490a3;font-size:9px}
+@media(max-width:650px){.forecast-result-actions{width:100%;align-items:stretch}.forecast-result-actions .data-export-button{flex:1;justify-content:center}.forecast-result-actions .forecast-success{align-self:flex-start}}
