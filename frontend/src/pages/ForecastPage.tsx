@@ -4,6 +4,7 @@ import { ArrowLeft, BarChart3, Download, FileSpreadsheet, LoaderCircle, UploadCl
 import { Link } from "react-router-dom";
 import { generateForecast } from "../lib/api";
 import { downloadCsv } from "../lib/csv";
+import ForecastTrend from "../components/ForecastTrend";
 import type { ForecastResult } from "../lib/api";
 
 export default function ForecastPage() {
@@ -123,6 +124,7 @@ export default function ForecastPage() {
               <div><small>FORECAST ROWS</small><strong>{result.metadata.forecast_rows.toLocaleString()}</strong></div>
               <div><small>HISTORY THROUGH</small><strong>{result.metadata.history_end}</strong></div>
             </div>
+            <ForecastTrend rows={result.forecast} />
             <div className="forecast-quality">
               <b>Data validation</b>
               <span>{result.quality_report.rows_valid.toLocaleString()} of {result.quality_report.rows_received.toLocaleString()} rows accepted · {(result.quality_report.rows_received - result.quality_report.rows_valid).toLocaleString()} excluded</span>
