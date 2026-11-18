@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { ArrowLeft, Boxes, Download, FileSpreadsheet, LoaderCircle, UploadCloud } from "lucide-react";
 import { Link } from "react-router-dom";
 import { downloadInventoryTemplate, generateInventoryRecommendations } from "../lib/api";
+import { downloadCsv } from "../lib/csv";
 import type { InventoryResult } from "../lib/api";
 
 type ForecastHorizon = 7 | 15 | 30;
@@ -131,7 +132,34 @@ export default function InventoryPage() {
           </div>
           {result.recommendations.length === 0 ? <p className="inventory-empty">No complete recommendations yet. Check that the inventory CSV contains stock and lead-time values for products with matching sales history.</p> :
             <div className="forecast-table-wrap">
-              <div className="forecast-table-title"><b>Recommended stock levels</b><span>Demand totals come from the generated forecast</span></div>
+              <div className="forecast-table-title">
+                <div><b>Recommended stock levels</b><span>Demand totals come from the generated forecast</span></div>
+                <button
+                  type="button"
+                  className="button data-export-button"
+                  onClick={() => downloadCsv(
+                    "demandiq_inventory_recommendations.csv",
+                    [
+                      "store", "item", "on_hand", "on_order", "backorders",
+                      "lead_time_days", "review_period_days", "avg_daily_demand",
+                      "daily_demand_std", "demand_records", "safety_stock",
+                      "demand_basis", "forecast_lead_demand",
+                      "forecast_protection_demand", "reorder_point", "target_stock",
+                      "inventory_position", "recommended_order_qty", "reorder_required",
+                    ],
+                    result.recommendations.map((row) => [
+                      row.store, row.item, row.on_hand, row.on_order, row.backorders,
+                      row.lead_time_days, row.review_period_days, row.avg_daily_demand,
+                      row.daily_demand_std, row.demand_records, row.safety_stock,
+                      row.demand_basis, row.forecast_lead_demand,
+                      row.forecast_protection_demand, row.reorder_point, row.target_stock,
+                      row.inventory_position, row.recommended_order_qty, row.reorder_required,
+                    ]),
+                  )}
+                >
+                  <Download size={15} /> Export recommendations
+                </button>
+              </div>
               <table className="forecast-table inventory-table">
                 <thead><tr><th>Store</th><th>Product</th><th>On hand</th><th>Forecast lead demand</th><th>Forecast cover demand</th><th>Reorder point</th><th>Target stock</th><th>Suggested order</th><th>Status</th></tr></thead>
                 <tbody>{result.recommendations.map((row, index) => <tr key={`${row.store}-${row.item}-${index}`}>
