@@ -11,6 +11,7 @@ from forecasting import (
     evaluate_random_forest,
     forecast_future_demand,
     recursive_multi_horizon_backtest,
+    rolling_origin_multi_horizon_backtest,
 )
 from inventory import (
     build_illustrative_inventory_inputs,
@@ -418,6 +419,81 @@ with forecast_tab:
         )
     except (ValueError, ImportError) as exc:
         st.warning(f"Recursive multi-horizon evaluation is not available: {exc}")
+
+    st.divider()
+    st.subheader("Rolling-origin reliability evaluation")
+    st.write(
+        "DemandIQ repeats the same recursive 30-day evaluation at three historical forecast "
+        "origins, spaced 15 days apart. Each origin trains only on data available before its "
+        "own holdout. Metrics are reported for cumulative 7-, 15- and 30-day horizons."
+    )
+
+    @st.cache_data(show_spinner="Evaluating three historical forecast origins...")
+    def run_rolling_origin_backtest(data: pd.DataFrame):
+        return rolling_origin_multi_horizon_backtest(
+            data, n_origins=3, step_days=15
+        )
+
+    try:
+        rolling_metrics, rolling_predictions, rolling_metadata = run_rolling_origin_backtest(df)
+        r1, r2, r3 = st.columns(3)
+        r1.metric("Historical origins", rolling_metadata["origins_evaluated"])
+        r2.metric("Days between origins", rolling_metadata["origin_spacing_days"])
+        r3.metric("Forecast window per origin", f"{rolling_metadata['holdout_days_per_origin']} days")
+
+        st.dataframe(
+            rolling_metrics.style.format({
+                "MAE": "{:,.2f}",
+                "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}",
+                "Bias (%)": "{:.2f}",
+                "mean_origin_WAPE (%)": "{:.2f}",
+                "WAPE_std_across_origins (%)": "{:.2f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.plotly_chart(
+            px.line(
+                rolling_metrics,
+                x="horizon_days",
+                y="WAPE (%)",
+                color="model",
+                markers=True,
+                title="Pooled WAPE across rolling origins — lower is better",
+            ),
+            width="stretch",
+        )
+        origin_stability = (
+            rolling_metrics[
+                ["model", "horizon_days", "mean_origin_WAPE (%)", "WAPE_std_across_origins (%)"]
+            ]
+        )
+        st.subheader("Forecast error stability across origins")
+        st.dataframe(
+            origin_stability.style.format({
+                "mean_origin_WAPE (%)": "{:.2f}",
+                "WAPE_std_across_origins (%)": "{:.2f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.download_button(
+            "Download rolling-origin evaluation (CSV)",
+            data=rolling_metrics.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_rolling_origin_evaluation.csv",
+            mime="text/csv",
+            key="download_rolling_origin_metrics",
+        )
+        st.caption(
+            f"Origins run from {rolling_metadata['first_origin_start']} to "
+            f"{rolling_metadata['last_origin_start']}. Holdout windows overlap because "
+            "origins are 15 days apart and each forecast window is 30 days. Pooled scores "
+            "therefore summarize forecast errors across these historical origins; they are "
+            "not statistically independent observations."
+        )
+    except (ValueError, ImportError) as exc:
+        st.warning(f"Rolling-origin evaluation is not available for this dataset: {exc}")
 
 with inventory_tab:
     st.subheader("Inventory planning — Reorder analysis")
