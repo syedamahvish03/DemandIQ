@@ -72,3 +72,5 @@
 .inventory-status{display:inline-flex;padding:5px 8px;border-radius:20px;background:#eaf8f1;color:#26845d;font-size:9px;font-weight:700}
 .inventory-status-alert{background:#fff2e8;color:#a85b24}
 @media(max-width:650px){.inventory-template-row{align-items:flex-start;flex-direction:column}.inventory-template-row button{width:100%;justify-content:center}}
+
+.forecast-page-links{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
