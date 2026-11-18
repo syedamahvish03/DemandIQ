@@ -306,3 +306,207 @@ def forecast_future_demand(
         "forecast_end": forecast["date"].max().date(),
     }
     return forecast, metadata
+
+
+def recursive_multi_horizon_backtest(
+    data: pd.DataFrame,
+    max_train_rows: int = 200_000,
+):
+    """Compare recursive forecasts over a shared final 30-day holdout.
+
+    All models forecast the entire holdout without observing its actual sales.
+    Metrics are reported for cumulative 7-, 15- and 30-day horizons, matching
+    the recursive strategy used by :func:`forecast_future_demand`.
+    """
+    if max_train_rows < 1:
+        raise ValueError("max_train_rows must be at least 1")
+
+    missing = sorted(set(REQUIRED_COLUMNS) - set(data.columns))
+    if missing:
+        raise ValueError("Missing required columns: " + ", ".join(missing))
+    if data.empty:
+        raise ValueError("No sales rows are available for multi-horizon backtesting.")
+
+    frame = data.loc[:, list(REQUIRED_COLUMNS)].copy()
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame["sales"] = pd.to_numeric(frame["sales"], errors="coerce")
+    if frame[["date", "store", "item", "sales"]].isna().any().any():
+        raise ValueError(
+            "Multi-horizon backtesting requires valid dates, store/item identifiers "
+            "and numeric sales. Clean invalid rows before evaluation."
+        )
+    if not np.isfinite(frame["sales"].to_numpy(dtype=float)).all():
+        raise ValueError("Sales values must be finite numbers.")
+    if frame["sales"].lt(0).any():
+        raise ValueError("Sales values must be non-negative.")
+    frame["date"] = frame["date"].dt.normalize()
+
+    if frame.duplicated(["store", "item", "date"]).any():
+        raise ValueError(
+            "Multi-horizon backtesting requires one sales row per date, store and item. "
+            "Aggregate duplicate daily records before evaluation."
+        )
+
+    frame = frame.sort_values(["store", "item", "date"]).reset_index(drop=True)
+    series_groups = list(frame.groupby(["store", "item"], sort=False))
+    if not series_groups:
+        raise ValueError("No store-item series are available for backtesting.")
+
+    holdout_dates = pd.DatetimeIndex(
+        sorted(frame["date"].drop_duplicates())[-30:]
+    )
+    if len(holdout_dates) < 30:
+        raise ValueError("At least 30 distinct dates are required for multi-horizon backtesting.")
+    holdout_start = holdout_dates[0]
+
+    histories = {}
+    for key, group in series_groups:
+        dates = pd.DatetimeIndex(group["date"])
+        if len(dates) < 45:
+            raise ValueError(
+                f"Store {key[0]}, item {key[1]} needs at least 45 daily observations "
+                "for a 30-day holdout and 15 days of feature history."
+            )
+        if dates.diff().dropna().ne(pd.Timedelta(days=1)).any():
+            raise ValueError(
+                f"Store {key[0]}, item {key[1]} has missing or irregular dates. "
+                "Provide a complete daily series before backtesting."
+            )
+        if not holdout_dates.isin(dates).all():
+            raise ValueError(
+                "Every store-item series must cover the same final 30-day holdout. "
+                "Align the evaluation period before backtesting."
+            )
+        train_group = group.loc[group["date"].lt(holdout_start)]
+        if len(train_group) < 15:
+            raise ValueError(
+                f"Store {key[0]}, item {key[1]} has insufficient pre-holdout history."
+            )
+        histories[key] = {
+            "sales": train_group["sales"].astype(float).tolist(),
+            "actuals": group.loc[group["date"].isin(holdout_dates), "sales"].astype(float).tolist(),
+        }
+
+    feature_columns = [
+        "lag_1", "lag_7", "lag_14", "rolling_mean_7", "rolling_mean_14",
+        "day_of_week", "month", "day_of_month", "year",
+    ]
+    training_features = build_time_features(frame.loc[frame["date"].lt(holdout_start)])
+    training = training_features.dropna(subset=feature_columns).copy()
+    if training.empty:
+        raise ValueError("Not enough pre-holdout history to train the Random Forest model.")
+    if len(training) > max_train_rows:
+        training = training.sample(n=max_train_rows, random_state=42)
+
+    from sklearn.ensemble import RandomForestRegressor
+
+    model = RandomForestRegressor(
+        n_estimators=100,
+        max_depth=16,
+        min_samples_leaf=3,
+        random_state=42,
+        n_jobs=-1,
+    )
+    model.fit(training[feature_columns], training["sales"])
+
+    prediction_rows = []
+    series_keys = list(histories)
+    for step, forecast_date in enumerate(holdout_dates, start=1):
+        rf_features = []
+        for key in series_keys:
+            values = histories[key]["sales"]
+            rf_features.append({
+                "lag_1": values[-1],
+                "lag_7": values[-7],
+                "lag_14": values[-14],
+                "rolling_mean_7": float(np.mean(values[-7:])),
+                "rolling_mean_14": float(np.mean(values[-14:])),
+                "day_of_week": forecast_date.day_of_week,
+                "month": forecast_date.month,
+                "day_of_month": forecast_date.day,
+                "year": forecast_date.year,
+            })
+        rf_values = model.predict(
+            pd.DataFrame(rf_features, columns=feature_columns)
+        ).clip(min=0)
+
+        for index, key in enumerate(series_keys):
+            history = histories[key]["sales"]
+            actual = histories[key]["actuals"][step - 1]
+            seasonal_prediction = float(history[-7])
+            moving_average_prediction = float(np.mean(history[-7:]))
+            rf_prediction = float(rf_values[index])
+            for model_name, prediction in (
+                ("seasonal_naive_7", seasonal_prediction),
+                ("moving_average_7", moving_average_prediction),
+                ("random_forest", rf_prediction),
+            ):
+                prediction_rows.append({
+                    "date": forecast_date,
+                    "store": key[0],
+                    "item": key[1],
+                    "actual": actual,
+                    "model": model_name,
+                    "prediction": prediction,
+                    "forecast_step": step,
+                })
+            # Each model must carry forward its own predictions, not actuals.
+            histories[key].setdefault("seasonal_naive_7", []).append(seasonal_prediction)
+            histories[key].setdefault("moving_average_7", []).append(moving_average_prediction)
+            histories[key].setdefault("random_forest", []).append(rf_prediction)
+            # Keep independent histories for the next recursive step.
+            if step == 1:
+                histories[key]["model_histories"] = {
+                    name: list(history) for name, history in (
+                        ("seasonal_naive_7", history),
+                        ("moving_average_7", history),
+                        ("random_forest", history),
+                    )
+                }
+            for model_name, prediction in (
+                ("seasonal_naive_7", seasonal_prediction),
+                ("moving_average_7", moving_average_prediction),
+                ("random_forest", rf_prediction),
+            ):
+                histories[key]["model_histories"][model_name].append(prediction)
+
+        # The shared base history is not updated with actual holdout sales.
+        # Model-specific recursive histories are used below for the next step.
+        for key in series_keys:
+            histories[key]["sales"] = histories[key]["model_histories"]["random_forest"]
+
+    predictions = pd.DataFrame(prediction_rows)
+    metric_rows = []
+    for horizon in (7, 15, 30):
+        horizon_predictions = predictions.loc[predictions["forecast_step"].le(horizon)]
+        for model_name, group in horizon_predictions.groupby("model"):
+            errors = group["prediction"] - group["actual"]
+            total_actual = float(group["actual"].sum())
+            metric_rows.append({
+                "model": model_name,
+                "horizon_days": horizon,
+                "MAE": float(errors.abs().mean()),
+                "RMSE": float(np.sqrt(np.mean(np.square(errors)))),
+                "WAPE (%)": (
+                    float(errors.abs().sum() / abs(total_actual) * 100)
+                    if total_actual != 0 else float("nan")
+                ),
+                "Bias (%)": (
+                    float(errors.sum() / total_actual * 100)
+                    if total_actual != 0 else float("nan")
+                ),
+            })
+
+    metrics = pd.DataFrame(metric_rows).sort_values(
+        ["horizon_days", "WAPE (%)"]
+    ).reset_index(drop=True)
+    metadata = {
+        "holdout_start": holdout_dates[0].date(),
+        "holdout_end": holdout_dates[-1].date(),
+        "holdout_days": 30,
+        "series_count": int(len(histories)),
+        "training_rows_used": int(len(training)),
+        "prediction_rows": int(len(predictions)),
+        "evaluation_method": "recursive_multi_step",
+    }
+    return metrics, predictions, metadata
