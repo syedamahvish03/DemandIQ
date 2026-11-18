@@ -298,8 +298,9 @@ with forecast_tab:
             width="stretch",
         )
         st.caption(
-            "These are benchmark results, not a claim of future accuracy. The test is a rolling "
-            "one-step-ahead evaluation; a later stage will compare a machine-learning model on the same dates."
+            "These are benchmark results, not a claim of future accuracy. This section uses "
+            "rolling one-step-ahead evaluation; the recursive multi-horizon section below evaluates "
+            "the production-style 7-, 15- and 30-day forecasting task."
         )
     except ValueError as exc:
         st.warning(f"Baseline evaluation is not available for this dataset: {exc}")
