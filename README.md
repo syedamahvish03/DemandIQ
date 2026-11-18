@@ -8,15 +8,16 @@ DemandIQ is a portfolio MVP that explores retail sales, forecasts product demand
 
 Core portfolio MVP stages include validated sales-data upload, exploratory analysis, chronological baseline and Random Forest evaluation, and inventory planning. Inventory results can run in an explicitly labelled illustrative scenario or from verified retailer-supplied stock data.
 
-## Planned capabilities
+## Implemented MVP capabilities
 
-- Retail sales data upload and validation
-- Exploratory analysis of products, stores, and sales trends
-- Time-series feature engineering and baseline forecasting
-- Machine-learning model training with chronological evaluation
-- 7-, 15-, and 30-day demand forecasts
-- Future forecast-driven lead-time demand, reorder-point and suggested-order calculations
-- Downloadable outputs
+- Retail sales CSV upload, validation and data-quality reporting
+- Exploratory analysis of products, stores, daily sales and weekday patterns
+- Leakage-aware time-series features and chronological baseline evaluation
+- Random Forest evaluation against the same chronological holdout
+- Recursive 7-, 15-, and 30-day future demand forecasts
+- Forecast-driven lead-time demand, reorder-point and suggested-order calculations
+- Clearly labelled illustrative inventory scenarios or retailer-supplied inventory inputs
+- Downloadable forecast, model-comparison, inventory-template and recommendation CSV files
 
 ## Technology
 
@@ -68,7 +69,17 @@ date,store,item,sales
 
 Demo data is synthetic and labelled as such. Model performance will be reported only after chronological validation against a baseline. Inventory inputs such as on-hand stock and supplier lead time will be configurable or explicitly illustrative unless supplied by a dataset.
 
-See docs/PROJECT_PLAN.md and data/README.md.
+See [the user guide](docs/USER_GUIDE.md), [the eight-day project plan](docs/PROJECT_PLAN.md), and [dataset notes](data/README.md).
+
+## Run automated tests
+
+Activate the project virtual environment, then run:
+
+```powershell
+python -m pytest -q
+```
+
+GitHub Actions runs the test suite automatically on pushes to `main` and pull requests targeting `main`.
 
 
 ## Inventory planning inputs
