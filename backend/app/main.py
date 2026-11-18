@@ -180,8 +180,15 @@ async def create_inventory_recommendations(
     inventory_file: UploadFile = File(..., description="Completed inventory-input CSV"),
     lookback_days: int = Form(28),
     service_level_z: float = Form(1.65),
+    forecast_horizon_days: int = Form(15),
 ) -> dict:
-    """Calculate reorder guidance using explicit retailer-provided stock inputs."""
+    """Generate demand forecasts and use them for inventory replenishment guidance."""
+    if forecast_horizon_days not in ALLOWED_HORIZONS:
+        raise HTTPException(
+            status_code=422,
+            detail="forecast_horizon_days must be one of 7, 15 or 30.",
+        )
+
     for upload, label in ((sales_file, "sales"), (inventory_file, "inventory")):
         if not (upload.filename or "").lower().endswith(".csv"):
             raise HTTPException(status_code=415, detail=f"Please upload a {label} CSV file.")
@@ -206,14 +213,25 @@ async def create_inventory_recommendations(
         )
 
     try:
+        demand_forecast, forecast_metadata = forecast_future_demand(
+            cleaned_sales,
+            horizon_days=forecast_horizon_days,
+        )
         recommendations, metadata = calculate_inventory_recommendations(
             cleaned_sales,
             inventory_frame.loc[:, list(INVENTORY_COLUMNS)],
             lookback_days=lookback_days,
             service_level_z=service_level_z,
+            demand_forecast=demand_forecast,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
+    except Exception:
+        logger.exception("Unexpected error while generating forecast-driven inventory recommendations.")
+        raise HTTPException(
+            status_code=500,
+            detail="Inventory recommendations could not be generated due to an internal processing error.",
+        ) from None
 
     metadata = {
         key: value.isoformat() if hasattr(value, "isoformat") else value
@@ -222,8 +240,14 @@ async def create_inventory_recommendations(
     records = recommendations.astype(object).where(pd.notna(recommendations), None).to_dict(orient="records")
     return {
         "status": "success",
-        "demand_basis": "historical_average",
-        "metadata": metadata,
+        "demand_basis": "future_forecast",
+        "metadata": {
+            **metadata,
+            "forecast_horizon_days": forecast_metadata["horizon_days"],
+            "forecast_rows": forecast_metadata["forecast_rows"],
+            "forecast_start": forecast_metadata["forecast_start"].isoformat(),
+            "forecast_end": forecast_metadata["forecast_end"].isoformat(),
+        },
         "sales_quality_report": quality_report,
         "recommendations": records,
     }
