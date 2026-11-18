@@ -187,3 +187,74 @@ def test_recursive_multi_horizon_predictions_do_not_use_holdout_actuals():
         original_predictions[comparison_columns],
         changed_predictions[comparison_columns],
     )
+
+
+def test_rolling_origin_backtest_evaluates_multiple_origins_and_horizons():
+    from forecasting import rolling_origin_multi_horizon_backtest
+
+    metrics, predictions, metadata = rolling_origin_multi_horizon_backtest(
+        sample_daily_sales(days=90), n_origins=3, step_days=15, max_train_rows=100
+    )
+
+    assert len(metrics) == 9
+    assert set(metrics["model"]) == {
+        "seasonal_naive_7", "moving_average_7", "random_forest"
+    }
+    assert set(metrics["horizon_days"]) == {7, 15, 30}
+    assert metrics["origins_evaluated"].eq(3).all()
+    assert metrics["WAPE_std_across_origins (%)"].notna().all()
+    assert predictions["origin"].nunique() == 3
+    assert len(predictions) == 3 * 30 * 4 * 3
+    assert metadata["origins_evaluated"] == 3
+    assert metadata["origin_spacing_days"] == 15
+    assert metadata["holdout_days_per_origin"] == 30
+    assert metadata["evaluation_method"] == "rolling_origin_recursive_multi_step"
+
+
+def test_rolling_origin_backtest_predictions_do_not_use_each_origin_holdout_actuals():
+    from forecasting import rolling_origin_multi_horizon_backtest
+
+    source = sample_daily_sales(days=90)
+    changed_holdouts = source.copy()
+    final_date = changed_holdouts["date"].max()
+    changed_holdouts.loc[
+        changed_holdouts["date"] > final_date - pd.Timedelta(days=30), "sales"
+    ] += 10_000
+
+    _, original_predictions, _ = rolling_origin_multi_horizon_backtest(source)
+    _, changed_predictions, _ = rolling_origin_multi_horizon_backtest(changed_holdouts)
+
+    comparison_columns = [
+        "origin", "origin_number", "date", "store", "item",
+        "model", "forecast_step", "prediction",
+    ]
+    pd.testing.assert_frame_equal(
+        original_predictions[comparison_columns],
+        changed_predictions[comparison_columns],
+    )
+
+
+def test_rolling_origin_backtest_rejects_insufficient_history():
+    from forecasting import rolling_origin_multi_horizon_backtest
+
+    with pytest.raises(ValueError, match="At least 76 distinct daily dates"):
+        rolling_origin_multi_horizon_backtest(sample_daily_sales(days=75))
+
+
+def test_rolling_origin_backtest_rejects_invalid_origin_count():
+    from forecasting import rolling_origin_multi_horizon_backtest
+
+    with pytest.raises(ValueError, match="n_origins must be at least 2"):
+        rolling_origin_multi_horizon_backtest(
+            sample_daily_sales(days=90), n_origins=1
+        )
+
+
+def test_rolling_origin_backtest_rejects_duplicate_daily_rows():
+    from forecasting import rolling_origin_multi_horizon_backtest
+
+    source = sample_daily_sales(days=90)
+    source = pd.concat([source, source.iloc[[0]]], ignore_index=True)
+
+    with pytest.raises(ValueError, match="one sales row per date"):
+        rolling_origin_multi_horizon_backtest(source)
