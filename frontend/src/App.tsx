@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Link, Route, Routes } from "react-router-dom";
 import {
-  ArrowDownRight, ArrowRight, BarChart3, Boxes, Check, ChevronDown,
+  ArrowDownRight, ArrowRight, BarChart3, Boxes, Check,
   CircleHelp, Eye, EyeOff, LineChart, LockKeyhole, Menu, PackageSearch,
   ShieldCheck, Sparkles, Store, TrendingUp, UploadCloud, X, Zap
 } from "lucide-react";
@@ -137,8 +137,6 @@ function AuthPage({ mode }: { mode: "login" | "signup" }) {
 }
 
 export default function App() {
-  const location = useLocation();
-  const isAuth = location.pathname === "/login" || location.pathname === "/signup";
   return <Routes>
     <Route path="/" element={<HomePage/>}/>
     <Route path="/login" element={<AuthPage mode="login"/>}/>
