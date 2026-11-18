@@ -258,3 +258,30 @@ def test_rolling_origin_backtest_rejects_duplicate_daily_rows():
 
     with pytest.raises(ValueError, match="one sales row per date"):
         rolling_origin_multi_horizon_backtest(source)
+
+
+def test_rolling_origin_backtest_rejects_irregular_daily_series():
+    from forecasting import rolling_origin_multi_horizon_backtest
+
+    source = sample_daily_sales(days=90).drop(index=10)
+
+    with pytest.raises(ValueError, match="missing or irregular dates"):
+        rolling_origin_multi_horizon_backtest(source, n_origins=3, step_days=15)
+
+
+def test_rolling_origin_backtest_rejects_non_positive_step():
+    from forecasting import rolling_origin_multi_horizon_backtest
+
+    with pytest.raises(ValueError, match="step_days must be at least 1"):
+        rolling_origin_multi_horizon_backtest(
+            sample_daily_sales(days=90), n_origins=3, step_days=0
+        )
+
+
+def test_rolling_origin_backtest_rejects_invalid_training_cap():
+    from forecasting import rolling_origin_multi_horizon_backtest
+
+    with pytest.raises(ValueError, match="max_train_rows must be at least 1"):
+        rolling_origin_multi_horizon_backtest(
+            sample_daily_sales(days=90), n_origins=3, max_train_rows=0
+        )
