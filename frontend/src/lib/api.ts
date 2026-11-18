@@ -95,3 +95,65 @@ export async function generateForecast(
   if (!response.ok) throw new Error(await readApiError(response));
   return (await response.json()) as ForecastResult;
 }
+
+
+export type InventoryRecommendation = {
+  store: string | number;
+  item: string | number;
+  on_hand: number;
+  on_order: number;
+  backorders: number;
+  lead_time_days: number;
+  review_period_days: number;
+  avg_daily_demand: number;
+  daily_demand_std: number;
+  demand_records: number;
+  safety_stock: number;
+  demand_basis: string;
+  reorder_point: number;
+  target_stock: number;
+  inventory_position: number;
+  recommended_order_qty: number;
+  reorder_required: boolean;
+};
+
+export type InventoryResult = {
+  status: "success";
+  demand_basis: "historical_average";
+  metadata: {
+    excluded_input_rows: number;
+    lookback_days: number;
+    demand_window_start?: string;
+    demand_window_end?: string;
+    complete_recommendations: number;
+  };
+  recommendations: InventoryRecommendation[];
+};
+
+export async function downloadInventoryTemplate(salesFile: File): Promise<Blob> {
+  const formData = new FormData();
+  formData.append("sales_file", salesFile);
+  const response = await fetch(`${API_BASE_URL}/api/v1/inventory/template`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) throw new Error(await readApiError(response));
+  return response.blob();
+}
+
+export async function generateInventoryRecommendations(
+  salesFile: File,
+  inventoryFile: File,
+): Promise<InventoryResult> {
+  const formData = new FormData();
+  formData.append("sales_file", salesFile);
+  formData.append("inventory_file", inventoryFile);
+  formData.append("lookback_days", "28");
+  formData.append("service_level_z", "1.65");
+  const response = await fetch(`${API_BASE_URL}/api/v1/inventory/recommendations`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) throw new Error(await readApiError(response));
+  return (await response.json()) as InventoryResult;
+}
