@@ -96,7 +96,6 @@ export async function generateForecast(
   return (await response.json()) as ForecastResult;
 }
 
-
 export type InventoryRecommendation = {
   store: string | number;
   item: string | number;
@@ -109,7 +108,9 @@ export type InventoryRecommendation = {
   daily_demand_std: number;
   demand_records: number;
   safety_stock: number;
-  demand_basis: string;
+  demand_basis: "future_forecast" | "historical_average";
+  forecast_lead_demand: number;
+  forecast_protection_demand: number;
   reorder_point: number;
   target_stock: number;
   inventory_position: number;
@@ -119,13 +120,17 @@ export type InventoryRecommendation = {
 
 export type InventoryResult = {
   status: "success";
-  demand_basis: "historical_average";
+  demand_basis: "future_forecast";
   metadata: {
     excluded_input_rows: number;
     lookback_days: number;
     demand_window_start?: string;
     demand_window_end?: string;
     complete_recommendations: number;
+    forecast_horizon_days: number;
+    forecast_rows: number;
+    forecast_start: string;
+    forecast_end: string;
   };
   recommendations: InventoryRecommendation[];
 };
@@ -144,12 +149,14 @@ export async function downloadInventoryTemplate(salesFile: File): Promise<Blob> 
 export async function generateInventoryRecommendations(
   salesFile: File,
   inventoryFile: File,
+  forecastHorizonDays: 7 | 15 | 30,
 ): Promise<InventoryResult> {
   const formData = new FormData();
   formData.append("sales_file", salesFile);
   formData.append("inventory_file", inventoryFile);
   formData.append("lookback_days", "28");
   formData.append("service_level_z", "1.65");
+  formData.append("forecast_horizon_days", String(forecastHorizonDays));
   const response = await fetch(`${API_BASE_URL}/api/v1/inventory/recommendations`, {
     method: "POST",
     body: formData,
