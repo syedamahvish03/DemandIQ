@@ -116,3 +116,56 @@ def test_future_forecast_rejects_duplicate_daily_series_rows():
 
     with pytest.raises(ValueError, match="one sales row per date"):
         forecast_future_demand(source, horizon_days=7)
+
+
+def test_recursive_multi_horizon_backtest_compares_models_at_all_horizons():
+    from forecasting import recursive_multi_horizon_backtest
+
+    metrics, predictions, metadata = recursive_multi_horizon_backtest(
+        sample_daily_sales(days=60), max_train_rows=100
+    )
+
+    assert set(metrics["model"]) == {
+        "seasonal_naive_7", "moving_average_7", "random_forest"
+    }
+    assert set(metrics["horizon_days"]) == {7, 15, 30}
+    assert len(metrics) == 9
+    assert len(predictions) == 30 * 4 * 3
+    assert metadata["holdout_days"] == 30
+    assert metadata["series_count"] == 4
+    assert metadata["training_rows_used"] <= 100
+    assert metadata["evaluation_method"] == "recursive_multi_step"
+    assert metrics[["MAE", "RMSE", "WAPE (%)", "Bias (%)"]].notna().all().all()
+
+
+def test_recursive_multi_horizon_backtest_rejects_duplicate_daily_rows():
+    from forecasting import recursive_multi_horizon_backtest
+
+    source = sample_daily_sales(days=60)
+    source = pd.concat([source, source.iloc[[0]]], ignore_index=True)
+
+    with pytest.raises(ValueError, match="one sales row per date"):
+        recursive_multi_horizon_backtest(source)
+
+
+def test_recursive_multi_horizon_backtest_rejects_irregular_series():
+    from forecasting import recursive_multi_horizon_backtest
+
+    source = sample_daily_sales(days=60).drop(index=5)
+
+    with pytest.raises(ValueError, match="missing or irregular dates"):
+        recursive_multi_horizon_backtest(source)
+
+
+def test_recursive_multi_horizon_backtest_rejects_insufficient_history():
+    from forecasting import recursive_multi_horizon_backtest
+
+    with pytest.raises(ValueError, match="at least 30 distinct dates"):
+        recursive_multi_horizon_backtest(sample_daily_sales(days=29))
+
+
+def test_recursive_multi_horizon_backtest_rejects_invalid_training_cap():
+    from forecasting import recursive_multi_horizon_backtest
+
+    with pytest.raises(ValueError, match="max_train_rows"):
+        recursive_multi_horizon_backtest(sample_daily_sales(days=60), max_train_rows=0)
