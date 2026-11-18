@@ -79,3 +79,13 @@ engine. It does not yet provide authentication, Supabase persistence, tenant
 isolation, saved forecast history, or inventory API endpoints. Do not upload
 private customer information to this development endpoint; authentication and
 workspace access controls are not yet implemented.
+
+
+## Inventory planning API
+
+The inventory workflow is stateless in this development stage: uploaded files are processed for the request and are not persisted.
+
+- `POST /api/v1/inventory/template`: upload a validated sales CSV as `sales_file`; returns a blank CSV with one row per store-item pair and the columns `store,item,on_hand,on_order,backorders,lead_time_days,review_period_days`.
+- `POST /api/v1/inventory/recommendations`: upload the sales CSV as `sales_file` and the completed stock-input CSV as `inventory_file`. Optional form fields are `lookback_days` (default 28) and `service_level_z` (default 1.65).
+
+Inventory recommendations use the existing `inventory.py` calculations and the latest historical sales window. They require explicit stock, incoming-order, backorder, lead-time, and review-period inputs. The API does not infer actual stock values, create purchase orders, or save uploaded data. This endpoint currently uses historical-average demand; forecast-driven replenishment can be added after the core workflow is verified.
