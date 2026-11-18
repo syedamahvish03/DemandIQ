@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { checkApiHealth } from "./lib/api";
+import ForecastPage from "./pages/ForecastPage";
 import { Link, Route, Routes } from "react-router-dom";
 import {
   ArrowDownRight, ArrowRight, BarChart3, Boxes, Check,
@@ -30,7 +31,7 @@ function Header() {
       </nav>
       <div className="nav-actions">
         <Link className="button button-quiet button-small" to="/login">Sign in</Link>
-        <Link className="button button-primary button-small" to="/signup">Get started <ArrowRight size={15} /></Link>
+        <Link className="button button-primary button-small" to="/workspace/forecasts">Try forecasting <ArrowRight size={15} /></Link>
       </div>
     </div>
   </header>;
@@ -172,6 +173,7 @@ export default function App() {
     <Route path="/" element={<HomePage/>}/>
     <Route path="/login" element={<AuthPage mode="login"/>}/>
     <Route path="/signup" element={<AuthPage mode="signup"/>}/>
+    <Route path="/workspace/forecasts" element={<ForecastPage/>}/>
     <Route path="*" element={<HomePage/>}/>
   </Routes>;
 }
