@@ -233,7 +233,7 @@ def forecast_future_demand(
             raise ValueError(
                 f"Store {store}, item {item} has fewer than 15 daily observations."
             )
-        if dates.diff().dropna().ne(pd.Timedelta(days=1)).any():
+        if (dates.diff().dropna() != pd.Timedelta(days=1)).any():
             raise ValueError(
                 f"Store {store}, item {item} has missing or irregular dates. "
                 "Provide a complete daily series before forecasting."
