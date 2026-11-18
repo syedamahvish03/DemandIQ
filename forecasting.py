@@ -233,7 +233,7 @@ def forecast_future_demand(
             raise ValueError(
                 f"Store {store}, item {item} has fewer than 15 daily observations."
             )
-        if (dates.diff().dropna() != pd.Timedelta(days=1)).any():
+        if dates.diff().dropna().ne(pd.Timedelta(days=1)).any():
             raise ValueError(
                 f"Store {store}, item {item} has missing or irregular dates. "
                 "Provide a complete daily series before forecasting."
@@ -356,7 +356,7 @@ def recursive_multi_horizon_backtest(
         sorted(frame["date"].drop_duplicates())[-30:]
     )
     if len(holdout_dates) < 30:
-        raise ValueError("At least 30 distinct dates are required for multi-horizon backtesting.")
+        raise ValueError("at least 30 distinct dates are required for multi-horizon backtesting.")
     holdout_start = holdout_dates[0]
 
     model_names = ("seasonal_naive_7", "moving_average_7", "random_forest")
@@ -368,7 +368,7 @@ def recursive_multi_horizon_backtest(
                 f"Store {key[0]}, item {key[1]} needs at least 45 daily observations "
                 "for a 30-day holdout and 15 days of feature history."
             )
-        if dates.diff().dropna().ne(pd.Timedelta(days=1)).any():
+        if (dates.diff().dropna() != pd.Timedelta(days=1)).any():
             raise ValueError(
                 f"Store {key[0]}, item {key[1]} has missing or irregular dates. "
                 "Provide a complete daily series before backtesting."
