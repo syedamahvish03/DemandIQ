@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { checkApiHealth } from "./lib/api";
 import ForecastPage from "./pages/ForecastPage";
 import InventoryPage from "./pages/InventoryPage";
+import AuthPage from "./components/AuthPage";
+import ProtectedRoute from "./components/ProtectedRoute";
 import { Link, Route, Routes } from "react-router-dom";
 import {
   ArrowDownRight, ArrowRight, BarChart3, Boxes, Check,
@@ -149,33 +151,13 @@ function HomePage() {
   </>;
 }
 
-function AuthPage({ mode }: { mode: "login" | "signup" }) {
-  const [showPassword, setShowPassword] = useState(false);
-  const [notice, setNotice] = useState(false);
-  const isSignup = mode === "signup";
-  return <div className="auth-layout">
-    <div className="auth-art"><Link to="/" className="auth-brand"><Brand/></Link><div className="auth-art-copy"><div className="eyebrow"><Sparkles size={14}/> RETAIL INTELLIGENCE, MADE CLEAR</div><h1>Your business<br/><span>has a next move.</span></h1><p>Bring your retail data into focus with product insights, demand forecasts and thoughtful inventory planning.</p><div className="auth-art-stat"><div><strong>7 / 15 / 30</strong><small>Day forecast horizons</small></div><div><strong>One place</strong><small>For your retail picture</small></div></div></div><div className="auth-art-bottom">DEMANDIQ · PRODUCT PREVIEW</div></div>
-    <div className="auth-panel"><Link className="back-home" to="/">← Back to website</Link><div className="auth-form-wrap"><div className="auth-mobile-brand"><Brand/></div><div className="auth-kicker">YOUR DEMANDIQ WORKSPACE</div><h2>{isSignup ? "Create your account" : "Welcome back"}</h2><p className="auth-subtitle">{isSignup ? "Start building a clearer picture of your retail business." : "Sign-in will be available when secure account access is connected."}</p>
-      <form onSubmit={(event) => { event.preventDefault(); setNotice(true); }}>
-        {isSignup && <label>Full name<input type="text" placeholder="Your name" autoComplete="name" /></label>}
-        <label>Work email<input type="email" placeholder="you@company.com" autoComplete="email" /></label>
-        <label>Password<div className="password-field"><input type={showPassword ? "text" : "password"} placeholder="At least 8 characters" autoComplete={isSignup ? "new-password" : "current-password"}/><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></div></label>
-        <button className="button button-primary auth-submit" type="submit">{isSignup ? "Create account" : "Sign in"} <ArrowRight size={16}/></button>
-      </form>
-      {notice && <div className="form-notice">This is the Stage 1 interface preview. Secure authentication will be connected in Stage 2; no account or password has been submitted or stored.</div>}
-      <div className="auth-next"><ShieldCheck size={17}/><span>Private business workspaces are part of the upcoming secure account implementation.</span></div>
-      <div className="auth-switch">{isSignup ? "Already have an account?" : "New to DemandIQ?"} <Link to={isSignup ? "/login" : "/signup"}>{isSignup ? "Sign in" : "Create an account"}</Link></div>
-    </div><div className="auth-legal">By continuing, you agree to use this product preview responsibly. Terms and privacy information will be published before account launch.</div></div>
-  </div>;
-}
-
 export default function App() {
   return <Routes>
     <Route path="/" element={<HomePage/>}/>
     <Route path="/login" element={<AuthPage mode="login"/>}/>
     <Route path="/signup" element={<AuthPage mode="signup"/>}/>
-    <Route path="/workspace/forecasts" element={<ForecastPage/>}/>
-    <Route path="/workspace/inventory" element={<InventoryPage/>}/>
+    <Route path="/workspace/forecasts" element={<ProtectedRoute><ForecastPage/></ProtectedRoute>}/>
+    <Route path="/workspace/inventory" element={<ProtectedRoute><InventoryPage/></ProtectedRoute>}/>
     <Route path="*" element={<HomePage/>}/>
   </Routes>;
 }
