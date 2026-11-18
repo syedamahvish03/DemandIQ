@@ -58,7 +58,7 @@ export default function InventoryPage() {
   return (
     <main className="forecast-page">
       <div className="forecast-container">
-        <Link to="/" className="forecast-back"><ArrowLeft size={16} /> Back to DemandIQ</Link>
+        <div className="forecast-page-links"><Link to="/" className="forecast-back"><ArrowLeft size={16} /> Back to DemandIQ</Link><Link to="/workspace/forecasts" className="forecast-back">Open demand forecasts →</Link></div>
         <div className="forecast-heading">
           <span className="forecast-eyebrow"><Boxes size={15} /> INVENTORY PLANNING</span>
           <h1>Plan your replenishment</h1>
