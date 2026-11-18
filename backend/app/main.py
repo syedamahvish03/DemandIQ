@@ -180,10 +180,10 @@ async def create_inventory_recommendations(
     inventory_file: UploadFile = File(..., description="Completed inventory-input CSV"),
     lookback_days: int = Form(28),
     service_level_z: float = Form(1.65),
-    forecast_horizon_days: int = Form(15),
+    forecast_horizon_days: int | None = Form(None),
 ) -> dict:
-    """Generate demand forecasts and use them for inventory replenishment guidance."""
-    if forecast_horizon_days not in ALLOWED_HORIZONS:
+    """Generate inventory guidance; forecast mode is opt-in for API compatibility."""
+    if forecast_horizon_days is not None and forecast_horizon_days not in ALLOWED_HORIZONS:
         raise HTTPException(
             status_code=422,
             detail="forecast_horizon_days must be one of 7, 15 or 30.",
@@ -213,10 +213,13 @@ async def create_inventory_recommendations(
         )
 
     try:
-        demand_forecast, forecast_metadata = forecast_future_demand(
-            cleaned_sales,
-            horizon_days=forecast_horizon_days,
-        )
+        forecast_metadata = None
+        demand_forecast = None
+        if forecast_horizon_days is not None:
+            demand_forecast, forecast_metadata = forecast_future_demand(
+                cleaned_sales,
+                horizon_days=forecast_horizon_days,
+            )
         recommendations, metadata = calculate_inventory_recommendations(
             cleaned_sales,
             inventory_frame.loc[:, list(INVENTORY_COLUMNS)],
@@ -238,16 +241,19 @@ async def create_inventory_recommendations(
         for key, value in metadata.items()
     }
     records = recommendations.astype(object).where(pd.notna(recommendations), None).to_dict(orient="records")
-    return {
-        "status": "success",
-        "demand_basis": "future_forecast",
-        "metadata": {
-            **metadata,
+    response_metadata = dict(metadata)
+    if forecast_metadata is not None:
+        response_metadata.update({
             "forecast_horizon_days": forecast_metadata["horizon_days"],
             "forecast_rows": forecast_metadata["forecast_rows"],
             "forecast_start": forecast_metadata["forecast_start"].isoformat(),
             "forecast_end": forecast_metadata["forecast_end"].isoformat(),
-        },
+        })
+
+    return {
+        "status": "success",
+        "demand_basis": metadata["demand_basis"],
+        "metadata": response_metadata,
         "sales_quality_report": quality_report,
         "recommendations": records,
     }
