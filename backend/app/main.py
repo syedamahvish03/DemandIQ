@@ -4,7 +4,7 @@ import os
 from io import BytesIO
 
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from data_validation import validate_sales_data
@@ -59,7 +59,7 @@ def health_check() -> dict[str, str]:
 @app.post("/api/v1/forecasts", tags=["Forecasting"])
 async def create_forecast(
     file: UploadFile = File(..., description="Historical sales CSV file"),
-    horizon_days: int = 7,
+    horizon_days: int = Form(7),
 ) -> dict:
     """Validate uploaded sales history and generate a future demand forecast."""
     if horizon_days not in ALLOWED_HORIZONS:
