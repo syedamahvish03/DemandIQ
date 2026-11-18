@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { ArrowLeft, BarChart3, FileSpreadsheet, LoaderCircle, UploadCloud } from "lucide-react";
+import { ArrowLeft, BarChart3, Download, FileSpreadsheet, LoaderCircle, UploadCloud } from "lucide-react";
 import { Link } from "react-router-dom";
 import { generateForecast } from "../lib/api";
+import { downloadCsv } from "../lib/csv";
 import type { ForecastResult } from "../lib/api";
 
 export default function ForecastPage() {
@@ -99,7 +100,22 @@ export default function ForecastPage() {
           <section className="forecast-results" aria-live="polite">
             <div className="forecast-result-heading">
               <div><span className="forecast-eyebrow">MODEL RESULTS</span><h2>Your demand forecast is ready</h2></div>
-              <span className="forecast-success">Forecast generated</span>
+              <div className="forecast-result-actions">
+                <span className="forecast-success">Forecast generated</span>
+                <button
+                  type="button"
+                  className="button data-export-button"
+                  onClick={() => downloadCsv(
+                    "demandiq_demand_forecast.csv",
+                    ["date", "store", "item", "forecast_sales", "forecast_step"],
+                    result.forecast.map((row) => [
+                      row.date, row.store, row.item, row.forecast_sales, row.forecast_step,
+                    ]),
+                  )}
+                >
+                  <Download size={15} /> Export full forecast
+                </button>
+              </div>
             </div>
             <div className="forecast-stats">
               <div><small>FORECAST PERIOD</small><strong>{result.metadata.horizon_days} days</strong></div>
@@ -109,8 +125,9 @@ export default function ForecastPage() {
             </div>
             <div className="forecast-quality">
               <b>Data validation</b>
-              <span>{result.quality_report.rows_valid.toLocaleString()} of {result.quality_report.rows_received.toLocaleString()} rows accepted</span>
+              <span>{result.quality_report.rows_valid.toLocaleString()} of {result.quality_report.rows_received.toLocaleString()} rows accepted · {(result.quality_report.rows_received - result.quality_report.rows_valid).toLocaleString()} excluded</span>
               {result.quality_report.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+              {result.quality_report.errors.map((message) => <p key={message}>{message}</p>)}
             </div>
             <div className="forecast-table-wrap">
               <div className="forecast-table-title"><b>Forecast detail</b><span>Showing up to 100 rows</span></div>
