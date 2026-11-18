@@ -89,3 +89,20 @@
 .forecast-table-title>div{display:grid;gap:4px}
 .forecast-table-title>div span{color:#8490a3;font-size:9px}
 @media(max-width:650px){.forecast-result-actions{width:100%;align-items:stretch}.forecast-result-actions .data-export-button{flex:1;justify-content:center}.forecast-result-actions .forecast-success{align-self:flex-start}}
+
+
+.forecast-trend{margin:22px 0;padding:22px;background:#fff;border:1px solid var(--line);border-radius:12px}
+.forecast-trend-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.forecast-trend-heading h3{font:700 17px Manrope,sans-serif;margin:7px 0 5px;color:#172033}
+.forecast-trend-heading p{font-size:11px;color:var(--muted);margin:0}
+.forecast-trend-total{text-align:right;white-space:nowrap}
+.forecast-trend-total strong{display:block;font:800 22px Manrope;color:#263b75}
+.forecast-trend-total span{font-size:10px;color:var(--muted)}
+.forecast-trend-chart{height:190px;display:flex;align-items:stretch;gap:5px;margin-top:24px;padding-top:22px;border-bottom:1px solid var(--line);overflow-x:auto}
+.forecast-trend-column{min-width:0;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px}
+.forecast-trend-value{font-size:8px;color:#778197;white-space:nowrap}
+.forecast-trend-track{height:125px;width:100%;display:flex;align-items:flex-end;justify-content:center;background:linear-gradient(to bottom,transparent 32%,#f4f6fb 32%,#f4f6fb 33%,transparent 33%,transparent 65%,#f4f6fb 65%,#f4f6fb 66%,transparent 66%)}
+.forecast-trend-bar{display:block;width:min(24px,75%);min-height:3px;border-radius:4px 4px 0 0;background:linear-gradient(180deg,#8ca2ff,#5875e8)}
+.forecast-trend-date{font-size:8px;color:#788399;white-space:nowrap;padding-bottom:8px}
+.forecast-trend-footer{display:flex;justify-content:space-between;gap:12px;margin-top:10px;color:#778197;font-size:10px}
+@media(max-width:600px){.forecast-trend{padding:16px 12px}.forecast-trend-chart{gap:3px}.forecast-trend-column{min-width:24px}.forecast-trend-value{font-size:7px}.forecast-trend-date{font-size:7px}.forecast-trend-footer{font-size:9px;flex-wrap:wrap}.forecast-trend-heading h3{font-size:15px}.forecast-trend-total strong{font-size:18px}}
