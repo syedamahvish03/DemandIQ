@@ -10,6 +10,7 @@ from forecasting import (
     chronological_baseline_backtest,
     evaluate_random_forest,
     forecast_future_demand,
+    recursive_multi_horizon_backtest,
 )
 from inventory import (
     build_illustrative_inventory_inputs,
@@ -363,6 +364,59 @@ with forecast_tab:
         )
     except (ValueError, ImportError) as exc:
         st.warning(f"Random Forest evaluation is not available: {exc}")
+
+    st.divider()
+    st.subheader("Recursive multi-horizon evaluation — 7, 15 and 30 days")
+    st.write(
+        "This is the production-aligned comparison. Each model forecasts the complete "
+        "30-day holdout recursively: predictions from earlier holdout days become inputs "
+        "for later days. Actual holdout sales are never fed back into a model."
+    )
+
+    @st.cache_data(show_spinner="Running recursive 7-, 15- and 30-day model evaluation...")
+    def run_multi_horizon_backtest(data: pd.DataFrame):
+        return recursive_multi_horizon_backtest(data)
+
+    try:
+        multi_metrics, multi_predictions, multi_metadata = run_multi_horizon_backtest(df)
+        h1, h2, h3 = st.columns(3)
+        h1.metric("Holdout period", f"{multi_metadata['holdout_start']} to {multi_metadata['holdout_end']}")
+        h2.metric("Store-item series", f"{multi_metadata['series_count']:,}")
+        h3.metric("Training rows", f"{multi_metadata['training_rows_used']:,}")
+
+        st.dataframe(
+            multi_metrics.style.format({
+                "MAE": "{:,.2f}", "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}", "Bias (%)": "{:.2f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.plotly_chart(
+            px.line(
+                multi_metrics,
+                x="horizon_days",
+                y="WAPE (%)",
+                color="model",
+                markers=True,
+                title="WAPE by forecast horizon — lower is better",
+            ),
+            width="stretch",
+        )
+        st.download_button(
+            "Download recursive multi-horizon metrics (CSV)",
+            data=multi_metrics.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_recursive_multi_horizon_metrics.csv",
+            mime="text/csv",
+            key="download_multi_horizon_metrics",
+        )
+        st.caption(
+            "The 7-, 15- and 30-day scores are cumulative from the same holdout origin. "
+            "This is one final holdout, not a multi-origin rolling backtest; results describe "
+            "this dataset and evaluation window only."
+        )
+    except (ValueError, ImportError) as exc:
+        st.warning(f"Recursive multi-horizon evaluation is not available: {exc}")
 
 with inventory_tab:
     st.subheader("Inventory planning — Reorder analysis")
