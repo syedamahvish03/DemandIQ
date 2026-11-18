@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { checkApiHealth } from "./lib/api";
 import ForecastPage from "./pages/ForecastPage";
+import InventoryPage from "./pages/InventoryPage";
 import { Link, Route, Routes } from "react-router-dom";
 import {
   ArrowDownRight, ArrowRight, BarChart3, Boxes, Check,
@@ -174,6 +175,7 @@ export default function App() {
     <Route path="/login" element={<AuthPage mode="login"/>}/>
     <Route path="/signup" element={<AuthPage mode="signup"/>}/>
     <Route path="/workspace/forecasts" element={<ForecastPage/>}/>
+    <Route path="/workspace/inventory" element={<InventoryPage/>}/>
     <Route path="*" element={<HomePage/>}/>
   </Routes>;
 }
