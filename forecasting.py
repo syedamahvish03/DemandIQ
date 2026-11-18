@@ -543,7 +543,7 @@ def rolling_origin_multi_horizon_backtest(
 
     frame = frame.sort_values(["store", "item", "date"]).reset_index(drop=True)
     unique_dates = pd.DatetimeIndex(sorted(frame["date"].drop_duplicates()))
-    required_dates = 45 + (n_origins - 1) * step_days
+    required_dates = 46 + (n_origins - 1) * step_days
     if len(unique_dates) < required_dates:
         raise ValueError(
             f"At least {required_dates} distinct daily dates are required for "
