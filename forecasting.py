@@ -494,3 +494,142 @@ def recursive_multi_horizon_backtest(
         "evaluation_method": "recursive_multi_step",
     }
     return metrics, predictions, metadata
+
+
+def rolling_origin_multi_horizon_backtest(
+    data: pd.DataFrame,
+    n_origins: int = 3,
+    step_days: int = 15,
+    max_train_rows: int = 200_000,
+):
+    """Evaluate recursive forecasts across multiple historical forecast origins.
+
+    Each origin uses its own pre-origin training history and a 30-day holdout.
+    Origins are spaced by step_days. Metrics pool forecasts across origins and
+    report variation in origin-level WAPE for 7-, 15- and 30-day horizons.
+    """
+    if n_origins < 2:
+        raise ValueError("n_origins must be at least 2 for rolling-origin evaluation.")
+    if step_days < 1:
+        raise ValueError("step_days must be at least 1.")
+    if max_train_rows < 1:
+        raise ValueError("max_train_rows must be at least 1.")
+
+    missing = sorted(set(REQUIRED_COLUMNS) - set(data.columns))
+    if missing:
+        raise ValueError("Missing required columns: " + ", ".join(missing))
+    if data.empty:
+        raise ValueError("No sales rows are available for rolling-origin backtesting.")
+
+    frame = data.loc[:, list(REQUIRED_COLUMNS)].copy()
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame["sales"] = pd.to_numeric(frame["sales"], errors="coerce")
+    if frame[["date", "store", "item", "sales"]].isna().any().any():
+        raise ValueError(
+            "Rolling-origin backtesting requires valid dates, store/item identifiers "
+            "and numeric sales. Clean invalid rows before evaluation."
+        )
+    if not np.isfinite(frame["sales"].to_numpy(dtype=float)).all():
+        raise ValueError("Sales values must be finite numbers.")
+    if frame["sales"].lt(0).any():
+        raise ValueError("Sales values must be non-negative.")
+    frame["date"] = frame["date"].dt.normalize()
+
+    if frame.duplicated(["store", "item", "date"]).any():
+        raise ValueError(
+            "Rolling-origin backtesting requires one sales row per date, store and item. "
+            "Aggregate duplicate daily records before evaluation."
+        )
+
+    frame = frame.sort_values(["store", "item", "date"]).reset_index(drop=True)
+    unique_dates = pd.DatetimeIndex(sorted(frame["date"].drop_duplicates()))
+    required_dates = 45 + (n_origins - 1) * step_days
+    if len(unique_dates) < required_dates:
+        raise ValueError(
+            f"At least {required_dates} distinct daily dates are required for "
+            f"{n_origins} origins spaced {step_days} days apart."
+        )
+
+    # Origins are ordered oldest to newest. Each holdout spans 30 consecutive days.
+    end_indices = [
+        len(unique_dates) - 1 - offset * step_days
+        for offset in reversed(range(n_origins))
+    ]
+    origin_predictions = []
+    origin_metrics = []
+    origin_metadata = []
+
+    for origin_number, end_index in enumerate(end_indices, start=1):
+        origin_end = unique_dates[end_index]
+        origin_start_index = end_index - 29
+        if origin_start_index < 15:
+            raise ValueError(
+                "Insufficient pre-origin history. Each origin needs at least "
+                "15 training days before its 30-day holdout."
+            )
+        origin_start = unique_dates[origin_start_index]
+        origin_data = frame.loc[frame["date"].le(origin_end)].copy()
+
+        metrics, predictions, metadata = recursive_multi_horizon_backtest(
+            origin_data,
+            max_train_rows=max_train_rows,
+        )
+        predictions["origin"] = origin_start
+        predictions["origin_number"] = origin_number
+        metrics["origin"] = origin_start
+        metrics["origin_number"] = origin_number
+        origin_predictions.append(predictions)
+        origin_metrics.append(metrics)
+        origin_metadata.append(metadata)
+
+    all_predictions = pd.concat(origin_predictions, ignore_index=True)
+    all_origin_metrics = pd.concat(origin_metrics, ignore_index=True)
+    metric_rows = []
+
+    for horizon in (7, 15, 30):
+        horizon_predictions = all_predictions.loc[
+            all_predictions["forecast_step"].le(horizon)
+        ]
+        for model_name, group in horizon_predictions.groupby("model"):
+            errors = group["prediction"] - group["actual"]
+            total_actual = float(group["actual"].sum())
+            per_origin_wape = all_origin_metrics.loc[
+                (all_origin_metrics["model"] == model_name)
+                & (all_origin_metrics["horizon_days"] == horizon),
+                "WAPE (%)",
+            ]
+            metric_rows.append({
+                "model": model_name,
+                "horizon_days": horizon,
+                "MAE": float(errors.abs().mean()),
+                "RMSE": float(np.sqrt(np.mean(np.square(errors)))),
+                "WAPE (%)": (
+                    float(errors.abs().sum() / abs(total_actual) * 100)
+                    if total_actual != 0 else float("nan")
+                ),
+                "Bias (%)": (
+                    float(errors.sum() / total_actual * 100)
+                    if total_actual != 0 else float("nan")
+                ),
+                "mean_origin_WAPE (%)": float(per_origin_wape.mean()),
+                "WAPE_std_across_origins (%)": float(per_origin_wape.std(ddof=0)),
+                "origins_evaluated": int(per_origin_wape.count()),
+            })
+
+    metrics = pd.DataFrame(metric_rows).sort_values(
+        ["horizon_days", "WAPE (%)"]
+    ).reset_index(drop=True)
+    metadata = {
+        "origins_evaluated": int(len(origin_metadata)),
+        "origin_spacing_days": int(step_days),
+        "holdout_days_per_origin": 30,
+        "first_origin_start": pd.Timestamp(origin_metadata[0]["holdout_start"]).date(),
+        "last_origin_start": pd.Timestamp(origin_metadata[-1]["holdout_start"]).date(),
+        "series_count": int(origin_metadata[-1]["series_count"]),
+        "training_rows_used_per_origin": [
+            int(item["training_rows_used"]) for item in origin_metadata
+        ],
+        "prediction_rows": int(len(all_predictions)),
+        "evaluation_method": "rolling_origin_recursive_multi_step",
+    }
+    return metrics, all_predictions, metadata
