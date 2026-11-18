@@ -7,7 +7,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { Link, Route, Routes } from "react-router-dom";
 import {
   ArrowDownRight, ArrowRight, BarChart3, Boxes, Check,
-  CircleHelp, Eye, EyeOff, LineChart, LockKeyhole, Menu, PackageSearch,
+  CircleHelp, LineChart, LockKeyhole, Menu, PackageSearch,
   ShieldCheck, Sparkles, Store, TrendingUp, UploadCloud, X, Zap
 } from "lucide-react";
 
