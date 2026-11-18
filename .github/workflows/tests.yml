@@ -33,6 +33,9 @@ jobs:
       - name: Run automated Python tests
         run: python -m pytest -q
 
+      - name: Check Streamlit app syntax
+        run: python -m py_compile app.py
+
       # React frontend
       - name: Set up Node.js
         uses: actions/setup-node@v4
