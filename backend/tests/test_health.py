@@ -226,9 +226,9 @@ def test_sales_validation_endpoint_returns_preview_and_import_readiness():
 
 def test_sales_validation_endpoint_blocks_duplicate_daily_keys():
     duplicate_csv = (
-        b"date,store,item,sales\\n"
-        b"2025-01-01,STORE_A,SKU_1,10\\n"
-        b"2025-01-01 18:00:00,STORE_A,SKU_1,12\\n"
+        b"date,store,item,sales\n"
+        b"2025-01-01,STORE_A,SKU_1,10\n"
+        b"2025-01-01 18:00:00,STORE_A,SKU_1,12\n"
     )
     response = client.post(
         "/api/v1/sales/validate",
@@ -244,9 +244,9 @@ def test_sales_validation_endpoint_blocks_duplicate_daily_keys():
 
 def test_sales_validation_endpoint_reports_excluded_rows():
     mixed_csv = (
-        b"date,store,item,sales\\n"
-        b"2025-01-01,STORE_A,SKU_1,10\\n"
-        b"not-a-date,STORE_A,SKU_1,12\\n"
+        b"date,store,item,sales\n"
+        b"2025-01-01,STORE_A,SKU_1,10\n"
+        b"not-a-date,STORE_A,SKU_1,12\n"
     )
     response = client.post(
         "/api/v1/sales/validate",
@@ -278,7 +278,7 @@ def test_sales_validation_endpoint_rejects_non_csv_and_oversized_uploads():
 def test_sales_validation_endpoint_rejects_invalid_csv_encoding():
     response = client.post(
         "/api/v1/sales/validate",
-        files={"file": ("sales.csv", BytesIO(b"date,store,item,sales\\n\\xff"), "text/csv")},
+        files={"file": ("sales.csv", BytesIO(b"date,store,item,sales\n\xff"), "text/csv")},
     )
 
     assert response.status_code == 400
