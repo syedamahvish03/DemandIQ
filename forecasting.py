@@ -678,6 +678,77 @@ def per_series_forecast_metrics(predictions: pd.DataFrame) -> pd.DataFrame:
             })
     return pd.DataFrame(rows).sort_values(["horizon_days", "model", "store", "item"]).reset_index(drop=True)
 
+
+def per_series_rolling_origin_metrics(predictions: pd.DataFrame) -> pd.DataFrame:
+    """Summarize recursive forecast accuracy and origin stability per store-item."""
+    required = {
+        "origin", "store", "item", "model", "actual", "prediction", "forecast_step"
+    }
+    missing = sorted(required - set(predictions.columns))
+    if missing:
+        raise ValueError("Missing required rolling prediction columns: " + ", ".join(missing))
+    if predictions.empty:
+        raise ValueError("No rolling-origin prediction rows are available.")
+    frame = predictions.loc[:, list(required)].copy()
+    for column in ("actual", "prediction", "forecast_step"):
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    if frame[list(required)].isna().any().any():
+        raise ValueError("Rolling-origin evaluation requires valid origins, identifiers and numeric predictions.")
+    values = frame[["actual", "prediction", "forecast_step"]].to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("Rolling-origin evaluation values must be finite.")
+    if frame["actual"].lt(0).any() or frame["prediction"].lt(0).any():
+        raise ValueError("Actual and predicted demand must be non-negative.")
+    steps = frame["forecast_step"]
+    if steps.lt(1).any() or not steps.mod(1).eq(0).all():
+        raise ValueError("Forecast steps must be positive whole numbers.")
+    key_columns = ["origin", "store", "item", "model", "forecast_step"]
+    if frame.duplicated(key_columns).any():
+        raise ValueError(
+            "Rolling predictions must contain one row per origin-store-item-model-forecast-step."
+        )
+
+    rows = []
+    series_columns = ["store", "item", "model"]
+    for (store, item, model_name), series in frame.groupby(series_columns, sort=False):
+        for horizon in (7, 15, 30):
+            window = series.loc[series["forecast_step"].le(horizon)]
+            if window.empty:
+                continue
+            errors = window["prediction"] - window["actual"]
+            total_actual = float(window["actual"].sum())
+            origin_wapes = []
+            for _, origin_group in window.groupby("origin", sort=False):
+                origin_actual = float(origin_group["actual"].sum())
+                if origin_actual > 0:
+                    origin_wapes.append(
+                        float((origin_group["prediction"] - origin_group["actual"]).abs().sum()
+                              / origin_actual * 100)
+                    )
+            rows.append({
+                "store": store,
+                "item": item,
+                "model": model_name,
+                "horizon_days": horizon,
+                "origins_evaluated": int(window["origin"].nunique()),
+                "evaluation_rows": int(len(window)),
+                "MAE": float(errors.abs().mean()),
+                "RMSE": float(np.sqrt(np.mean(np.square(errors)))),
+                "WAPE (%)": float(errors.abs().sum() / total_actual * 100)
+                    if total_actual > 0 else float("nan"),
+                "Bias (%)": float(errors.sum() / total_actual * 100)
+                    if total_actual > 0 else float("nan"),
+                "mean_origin_WAPE (%)": float(np.mean(origin_wapes))
+                    if origin_wapes else float("nan"),
+                "WAPE_std_across_origins (%)": float(np.std(origin_wapes, ddof=0))
+                    if origin_wapes else float("nan"),
+                "actual_units": total_actual,
+            })
+    return pd.DataFrame(rows).sort_values(
+        ["horizon_days", "model", "store", "item"]
+    ).reset_index(drop=True)
+
+
 def rolling_origin_multi_horizon_backtest(
     data: pd.DataFrame,
     n_origins: int = 3,
