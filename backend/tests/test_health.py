@@ -161,3 +161,45 @@ def test_forecast_endpoint_rejects_upload_over_size_limit():
 
     assert response.status_code == 413
     assert "10 MB upload limit" in response.json()["detail"]
+
+
+
+def test_forecast_endpoint_accepts_mixed_date_representations():
+    dates = pd.date_range("2025-01-01", periods=50, freq="D")
+    frame = pd.DataFrame({
+        "date": [
+            date.strftime("%Y-%m-%d") if index % 2 == 0
+            else date.strftime("%Y-%m-%d %H:%M:%S")
+            for index, date in enumerate(dates)
+        ],
+        "store": ["STORE_A"] * 50,
+        "item": ["SKU_100"] * 50,
+        "sales": [20 + (index % 7) for index in range(50)],
+    })
+    response = client.post(
+        "/api/v1/forecasts",
+        files={
+            "file": (
+                "mixed_dates.csv",
+                BytesIO(frame.to_csv(index=False).encode("utf-8")),
+                "text/csv",
+            )
+        },
+        data={"horizon_days": "7"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["quality_report"]["rows_valid"] == 50
+    assert len(payload["forecast"]) == 7
+
+
+def test_forecast_endpoint_rejects_invalid_text_encoding():
+    response = client.post(
+        "/api/v1/forecasts",
+        files={"file": ("sales.csv", BytesIO(b"date,store,item,sales\n\xff"), "text/csv")},
+        data={"horizon_days": "7"},
+    )
+
+    assert response.status_code == 400
+    assert "valid CSV" in response.json()["detail"]
