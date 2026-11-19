@@ -1,4 +1,5 @@
 """Reusable validation and cleaning for DemandIQ retail sales CSV files."""
+import numpy as np
 import pandas as pd
 
 REQUIRED_COLUMNS = ("date", "store", "item", "sales")
@@ -33,8 +34,12 @@ def validate_sales_data(data: pd.DataFrame):
     parsed_dates = pd.to_datetime(df["date"], errors="coerce")
     numeric_sales = pd.to_numeric(df["sales"], errors="coerce")
     invalid_dates = parsed_dates.isna()
-    invalid_sales = numeric_sales.isna()
-    negative_sales = numeric_sales.lt(0).fillna(False)
+    finite_sales = pd.Series(
+        np.isfinite(numeric_sales.fillna(0).to_numpy(dtype=float)),
+        index=numeric_sales.index,
+    )
+    invalid_sales = numeric_sales.isna() | ~finite_sales
+    negative_sales = numeric_sales.lt(0).fillna(False) & finite_sales
     missing_identifiers = df["store"].isna() | df["item"].isna()
 
     report["invalid_dates"] = int(invalid_dates.sum())
@@ -52,7 +57,7 @@ def validate_sales_data(data: pd.DataFrame):
     if report["invalid_dates"]:
         report["warnings"].append(f"{report['invalid_dates']} row(s) have invalid or missing dates and were excluded.")
     if report["invalid_sales"]:
-        report["warnings"].append(f"{report['invalid_sales']} row(s) have missing or non-numeric sales and were excluded.")
+        report["warnings"].append(f"{report['invalid_sales']} row(s) have missing, non-numeric or non-finite sales and were excluded.")
     if report["negative_sales"]:
         report["warnings"].append(f"{report['negative_sales']} row(s) have negative sales and were excluded.")
     if report["missing_identifiers"]:
