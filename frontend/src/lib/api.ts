@@ -176,6 +176,12 @@ export type SalesValidationResult = {
     item: string | number;
     sales: number;
   }>;
+  validated_rows?: Array<{
+    date: string;
+    store: string | number;
+    item: string | number;
+    sales: number;
+  }>;
   quality_report: {
     rows_received: number;
     rows_valid: number;
@@ -191,10 +197,14 @@ export type SalesValidationResult = {
   excluded_rows: number;
 };
 
-export async function validateSalesCsv(file: File): Promise<SalesValidationResult> {
+export async function validateSalesCsv(
+  file: File,
+  includeRecords = false,
+): Promise<SalesValidationResult> {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await fetch(`${API_BASE_URL}/api/v1/sales/validate`, {
+  const query = includeRecords ? "?include_records=true" : "";
+  const response = await fetch(`${API_BASE_URL}/api/v1/sales/validate${query}`, {
     method: "POST",
     body: formData,
   });
