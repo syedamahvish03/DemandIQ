@@ -253,3 +253,33 @@
 .product-row-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:28px;padding:5px 8px;border:1px solid #dfe5f0;border-radius:6px;background:#fff;color:#586782;font-size:9px;cursor:pointer}
 .product-row-actions button:last-child{color:#a65b4b;border-color:#f0deda}
 @media(max-width:750px){.product-form{grid-template-columns:1fr}.product-form-actions{grid-column:auto}.sales-panel-heading:has(.product-search){align-items:stretch;flex-direction:column}.product-search{max-width:none}}
+
+/* Stage 5: explainable inventory signals and supplier workspace */
+.inventory-insights{margin:18px 0;padding:19px;border:1px solid #e4e9f3;border-radius:12px;background:#fff}
+.inventory-insights-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.inventory-insights-heading h3{margin:7px 0 4px;color:#26344c;font:700 16px Manrope,sans-serif}
+.inventory-insights-heading p{margin:0;color:#7c879b;font-size:10px;line-height:1.6}
+.inventory-alert-count{padding:7px 10px;border-radius:20px;background:#eaf8f1;color:#287052;font-size:9px;font-weight:800;white-space:nowrap}
+.inventory-alert-count.has-alerts{background:#fff0e9;color:#a34d2c}
+.inventory-alert-list{display:grid;gap:8px;margin-top:15px}
+.inventory-alert-item{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:11px;padding:11px;border:1px solid #f0dfd8;border-radius:8px;background:#fffaf8}
+.inventory-alert-symbol{width:32px;height:32px;display:grid;place-items:center;border-radius:8px;background:#ffede5;color:#b35c38}
+.inventory-alert-item b{display:block;color:#344158;font-size:10px}
+.inventory-alert-item p{margin:4px 0 0;color:#778398;font-size:9px;line-height:1.5}
+.inventory-alert-item>strong{color:#a34d2c;font-size:11px;white-space:nowrap}
+.inventory-all-clear{padding:12px;border:1px solid #d9eee4;border-radius:8px;background:#f4fbf7;color:#39745c;font-size:10px;line-height:1.6}
+.inventory-explanation-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:13px}
+.inventory-explanation-grid>div{display:grid;gap:5px;padding:11px;border:1px solid #edf0f5;border-radius:8px;background:#fafbfe}
+.inventory-explanation-grid b{color:#465675;font-size:9px}
+.inventory-explanation-grid span{color:#7c879b;font-size:9px;line-height:1.55}
+.supplier-form-card h2{margin:0 0 17px;color:#26344c;font:700 17px Manrope,sans-serif}
+.supplier-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.supplier-form label{display:grid;gap:7px;color:#526078;font-size:10px;font-weight:700}
+.supplier-form input,.supplier-form textarea{width:100%;min-height:40px;padding:10px 11px;border:1px solid #dfe4ed;border-radius:8px;background:#fff;color:#344158;font:inherit;font-size:11px;outline:none}
+.supplier-form textarea{min-height:82px;resize:vertical}
+.supplier-form input:focus,.supplier-form textarea:focus{border-color:#7189f5;box-shadow:0 0 0 3px #7189f51b}
+.supplier-notes-field{grid-column:1/-1}
+.supplier-form .product-form-actions{grid-column:1/-1}
+.supplier-table{min-width:760px}
+.supplier-notes{display:block;max-width:240px;margin-top:5px;color:#8590a3;font-size:9px;line-height:1.5;white-space:normal}
+@media(max-width:700px){.inventory-explanation-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.inventory-alert-item{grid-template-columns:30px minmax(0,1fr)}.inventory-alert-item>strong{grid-column:2}.inventory-insights-heading{flex-direction:column}.supplier-form{grid-template-columns:1fr}.supplier-notes-field,.supplier-form .product-form-actions{grid-column:auto}}
