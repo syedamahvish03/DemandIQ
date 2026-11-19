@@ -1,6 +1,7 @@
 import { ArrowRight, BarChart3, Boxes, Building2, CircleHelp, Clock3, FileUp, LineChart, PackageSearch, ShieldCheck, Store, TrendingUp } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../lib/AuthContext";
+import PwaInstallPrompt from "../components/PwaInstallPrompt";
 
 const workspaceLinks = [
   { to: "/workspace", label: "Overview", icon: BarChart3, end: true },
@@ -54,7 +55,7 @@ export default function DashboardPage() {
               <h1>Welcome, {firstName}.</h1>
               <p>Your retail planning workspace is ready. Choose a workflow to get started.</p>
             </div>
-            <div className="workspace-date"><Clock3 size={15}/>{new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(new Date())}</div>
+            <div className="workspace-date"><Clock3 size={15}/>{new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(new Date())}<PwaInstallPrompt /></div>
           </div>
 
           <section className="workspace-start-section">
