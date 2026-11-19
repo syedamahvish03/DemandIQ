@@ -758,3 +758,80 @@ def test_forecast_error_by_step_rejects_invalid_prediction_rows(mutation, messag
 
     with pytest.raises(ValueError, match=message):
         forecast_error_by_step(predictions)
+
+def _pattern_evaluation_fixture():
+    from forecasting import forecast_accuracy_by_demand_pattern
+
+    dates = pd.date_range("2025-01-01", periods=60, freq="D")
+    history_rows = []
+    prediction_rows = []
+    origin = dates[-1] + pd.Timedelta(days=1)
+    for item, pattern_sales in (
+        (101, lambda index: 10.0),
+        (102, lambda index: 10.0 if index % 5 == 0 else 0.0),
+    ):
+        for index, date in enumerate(dates):
+            history_rows.append({
+                "date": date, "store": 1, "item": item,
+                "sales": pattern_sales(index),
+            })
+        for step in range(1, 31):
+            prediction_rows.append({
+                "date": origin + pd.Timedelta(days=step),
+                "store": 1, "item": item, "model": "random_forest",
+                "actual": 12.0 if item == 101 else (10.0 if step % 5 == 0 else 0.0),
+                "prediction": 11.0 if item == 101 else 1.0,
+                "forecast_step": step,
+            })
+    return pd.DataFrame(history_rows), pd.DataFrame(prediction_rows)
+
+
+def test_demand_pattern_forecast_metrics_segment_by_pre_origin_pattern_and_horizon():
+    from forecasting import forecast_accuracy_by_demand_pattern
+
+    history, predictions = _pattern_evaluation_fixture()
+    metrics = forecast_accuracy_by_demand_pattern(predictions, history)
+
+    assert set(metrics["demand_pattern"]) == {"smooth", "intermittent"}
+    assert set(metrics["horizon_days"]) == {7, 15, 30}
+    assert metrics.groupby("demand_pattern")["horizon_days"].nunique().eq(3).all()
+    intermittent_7 = metrics.loc[
+        (metrics["demand_pattern"] == "intermittent")
+        & metrics["horizon_days"].eq(7)
+    ].iloc[0]
+    assert intermittent_7["evaluation_rows"] == 7
+    assert intermittent_7["series_count"] == 1
+
+
+def test_demand_pattern_forecast_metrics_do_not_use_post_origin_history():
+    from forecasting import forecast_accuracy_by_demand_pattern
+
+    history, predictions = _pattern_evaluation_fixture()
+    original = forecast_accuracy_by_demand_pattern(predictions, history)
+    future_rows = []
+    origin = predictions["date"].min() - pd.Timedelta(days=1)
+    for item in (101, 102):
+        for step in range(1, 31):
+            future_rows.append({
+                "date": origin + pd.Timedelta(days=step),
+                "store": 1, "item": item, "sales": 9999.0,
+            })
+    extended_history = pd.concat(
+        [history, pd.DataFrame(future_rows)], ignore_index=True
+    )
+    extended = forecast_accuracy_by_demand_pattern(predictions, extended_history)
+
+    assert original[["demand_pattern", "model", "horizon_days"]].equals(
+        extended[["demand_pattern", "model", "horizon_days"]]
+    )
+
+
+def test_demand_pattern_forecast_metrics_reject_mixed_forecast_origins():
+    from forecasting import forecast_accuracy_by_demand_pattern
+
+    history, predictions = _pattern_evaluation_fixture()
+    predictions.loc[predictions.index[0], "date"] += pd.Timedelta(days=1)
+
+    with pytest.raises(ValueError, match="one common forecast origin"):
+        forecast_accuracy_by_demand_pattern(predictions, history)
+
