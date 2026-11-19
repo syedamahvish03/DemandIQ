@@ -679,6 +679,101 @@ def per_series_forecast_metrics(predictions: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values(["horizon_days", "model", "store", "item"]).reset_index(drop=True)
 
 
+def forecast_accuracy_by_demand_pattern(
+    predictions: pd.DataFrame,
+    historical_data: pd.DataFrame,
+) -> pd.DataFrame:
+    """Break recursive holdout accuracy down by demand pattern known at forecast origin.
+
+    Demand patterns are classified using historical rows strictly before the
+    common forecast origin. Holdout actuals are never used to assign a pattern.
+    """
+    required_predictions = {
+        "date", "store", "item", "model", "actual", "prediction", "forecast_step"
+    }
+    missing = sorted(required_predictions - set(predictions.columns))
+    if missing:
+        raise ValueError("Missing required prediction columns: " + ", ".join(missing))
+    missing_history = sorted(set(REQUIRED_COLUMNS) - set(historical_data.columns))
+    if missing_history:
+        raise ValueError("Historical data is missing required columns: " + ", ".join(missing_history))
+    if predictions.empty:
+        raise ValueError("No prediction rows are available for demand-pattern evaluation.")
+
+    frame = predictions.loc[:, list(required_predictions)].copy()
+    frame["date"] = pd.to_datetime(frame["date"], format="mixed", errors="coerce").dt.normalize()
+    for column in ("actual", "prediction", "forecast_step"):
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    if frame[list(required_predictions)].isna().any().any():
+        raise ValueError("Demand-pattern evaluation requires valid dates, identifiers and numeric predictions.")
+    values = frame[["actual", "prediction", "forecast_step"]].to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("Demand-pattern evaluation values must be finite.")
+    if frame["actual"].lt(0).any() or frame["prediction"].lt(0).any():
+        raise ValueError("Actual and predicted demand must be non-negative.")
+    if frame["forecast_step"].lt(1).any() or not frame["forecast_step"].mod(1).eq(0).all():
+        raise ValueError("Forecast steps must be positive whole numbers.")
+    if frame[["store", "item", "model"]].astype(str).apply(
+        lambda column: column.str.strip().eq("")
+    ).any(axis=1).any():
+        raise ValueError("Store, item and model identifiers must be nonblank.")
+    if frame.duplicated(["date", "store", "item", "model"]).any():
+        raise ValueError("Demand-pattern evaluation requires one row per date-store-item-model.")
+
+    origin_dates = (
+        frame["date"] - pd.to_timedelta(frame["forecast_step"], unit="D")
+    ).drop_duplicates()
+    if len(origin_dates) != 1:
+        raise ValueError("Demand-pattern evaluation requires predictions from one common forecast origin.")
+    origin = origin_dates.iloc[0]
+
+    history = historical_data.loc[:, list(REQUIRED_COLUMNS)].copy()
+    history["date"] = pd.to_datetime(history["date"], format="mixed", errors="coerce").dt.normalize()
+    history = history.loc[history["date"].lt(origin)].copy()
+    if history.empty:
+        raise ValueError("No pre-origin historical data is available for demand-pattern classification.")
+
+    patterns = classify_demand_patterns(history)
+    pattern_lookup = {
+        (row.store, row.item): row.demand_pattern
+        for row in patterns.itertuples(index=False)
+    }
+    frame["demand_pattern"] = [
+        pattern_lookup.get((store, item))
+        for store, item in zip(frame["store"], frame["item"])
+    ]
+    if frame["demand_pattern"].isna().any():
+        raise ValueError("Every forecast store-item pair must have pre-origin demand history.")
+
+    rows = []
+    for (pattern, model_name), series in frame.groupby(
+        ["demand_pattern", "model"], sort=True
+    ):
+        for horizon in (7, 15, 30):
+            window = series.loc[series["forecast_step"].le(horizon)]
+            if window.empty:
+                continue
+            errors = window["prediction"] - window["actual"]
+            actual_units = float(window["actual"].sum())
+            rows.append({
+                "demand_pattern": pattern,
+                "model": model_name,
+                "horizon_days": horizon,
+                "series_count": int(window[["store", "item"]].drop_duplicates().shape[0]),
+                "evaluation_rows": int(len(window)),
+                "MAE": float(errors.abs().mean()),
+                "RMSE": float(np.sqrt(np.mean(np.square(errors)))),
+                "WAPE (%)": float(errors.abs().sum() / actual_units * 100)
+                    if actual_units > 0 else float("nan"),
+                "Bias (%)": float(errors.sum() / actual_units * 100)
+                    if actual_units > 0 else float("nan"),
+                "actual_units": actual_units,
+            })
+    return pd.DataFrame(rows).sort_values(
+        ["horizon_days", "demand_pattern", "model"]
+    ).reset_index(drop=True)
+
+
 def forecast_error_by_step(predictions: pd.DataFrame) -> pd.DataFrame:
     """Measure recursive forecast accuracy separately at each forecast lead day."""
     required = {"store", "item", "model", "actual", "prediction", "forecast_step"}
