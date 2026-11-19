@@ -101,3 +101,21 @@ def test_duplicate_daily_keys_with_different_sales_are_flagged():
     assert len(cleaned) == 3
     assert report["duplicate_rows"] == 1
     assert any("duplicate daily store-item date" in warning for warning in report["warnings"])
+
+
+def test_mixed_date_formats_are_parsed_without_excluding_valid_rows():
+    source = pd.DataFrame({
+        "date": ["2025-01-01", "2025-01-02 09:30:00", "2025-01-03"],
+        "store": ["STORE_A", "STORE_A", "STORE_A"],
+        "item": ["ITEM_1", "ITEM_1", "ITEM_1"],
+        "sales": [10, 12, 14],
+    })
+
+    cleaned, report = validate_sales_data(source)
+
+    assert len(cleaned) == 3
+    assert report["invalid_dates"] == 0
+    assert report["rows_valid"] == 3
+    assert cleaned["date"].dt.strftime("%Y-%m-%d").tolist() == [
+        "2025-01-01", "2025-01-02", "2025-01-03"
+    ]
