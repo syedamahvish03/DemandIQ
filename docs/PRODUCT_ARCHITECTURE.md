@@ -134,11 +134,21 @@ Therefore:
 - Add workspace-scoped APIs and product/store drill-downs.
 
 ### Stage 5 — Advanced product features
-- Add alerts, explainable insights, saved reports, supplier workflows, and PWA installation refinements.
+- Add inventory alerts and explainable replenishment insights.
+- Add a workspace-scoped supplier directory for supplier contacts and default lead-time references.
+- Improve saved analysis/report workflows and CSV exports.
+- Add PWA manifest, installation prompt, and a conservative offline navigation fallback.
 
 ### Stage 6 — Hardening and release readiness
-- Cross-tenant security tests, functional tests, accessibility, performance, backup/recovery review, documentation, and deployment.
-- This stage is deliberately deferred until the user approves it.
+- Cross-tenant security tests, functional tests, accessibility, performance, backup/recovery review, documentation, and release preparation.
+- Verify production environment configuration and deployment prerequisites.
+
+### Final release phase — Production deployment
+- Deploy the frontend and FastAPI backend to selected hosting providers.
+- Configure production environment variables, Supabase URL/keys, CORS, HTTPS, and allowed origins.
+- Apply reviewed Supabase migrations to the production project.
+- Verify authentication, sales imports, forecasts, inventory plans, supplier records, and saved analyses against the live services.
+- Deployment is separate from the numbered Stage 0–6 development roadmap and requires the user's approval.
 
 ## 10. Non-goals for the first product release
 
