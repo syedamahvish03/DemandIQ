@@ -158,14 +158,14 @@ def test_forecast_inventory_rejects_duplicate_daily_predictions():
 
 
 def test_inventory_rejects_non_finite_stock_inputs():
-    invalid = inventory_fixture()
+    invalid = inventory_fixture().astype({"on_hand": float})
     invalid.loc[0, "on_hand"] = float("inf")
     with pytest.raises(ValueError, match="finite numbers"):
         calculate_inventory_recommendations(sales_fixture(), invalid)
 
 
 def test_inventory_rejects_fractional_supplier_time_days():
-    invalid = inventory_fixture()
+    invalid = inventory_fixture().astype({"lead_time_days": float})
     invalid.loc[0, "lead_time_days"] = 2.5
     with pytest.raises(ValueError, match="whole numbers of days"):
         calculate_inventory_recommendations(sales_fixture(), invalid)
