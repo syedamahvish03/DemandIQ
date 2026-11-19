@@ -553,3 +553,62 @@ def test_per_series_metrics_rejects_invalid_prediction_rows(mutation, message):
         predictions.loc[0, "prediction"] = float("inf")
     with pytest.raises(ValueError, match=message):
         per_series_forecast_metrics(predictions)
+
+
+def test_per_series_rolling_origin_metrics_report_accuracy_and_origin_stability():
+    from forecasting import per_series_rolling_origin_metrics
+
+    predictions = pd.DataFrame([
+        {
+            "origin": origin, "store": "S1", "item": "P1", "model": "rf",
+            "actual": 10.0, "prediction": prediction, "forecast_step": step,
+        }
+        for origin, prediction in [
+            (pd.Timestamp("2025-01-01"), 12.0),
+            (pd.Timestamp("2025-01-16"), 8.0),
+        ]
+        for step in range(1, 31)
+    ])
+    result = per_series_rolling_origin_metrics(predictions)
+
+    assert result["horizon_days"].tolist() == [7, 15, 30]
+    row = result.loc[result["horizon_days"] == 7].iloc[0]
+    assert row["origins_evaluated"] == 2
+    assert row["evaluation_rows"] == 14
+    assert row["WAPE (%)"] == pytest.approx(20.0)
+    assert row["Bias (%)"] == pytest.approx(0.0)
+    assert row["mean_origin_WAPE (%)"] == pytest.approx(20.0)
+    assert row["WAPE_std_across_origins (%)"] == pytest.approx(0.0)
+
+
+def test_per_series_rolling_origin_metrics_marks_zero_demand_percentage_metrics_undefined():
+    from forecasting import per_series_rolling_origin_metrics
+
+    predictions = pd.DataFrame([
+        {
+            "origin": origin, "store": 1, "item": 2, "model": "rf",
+            "actual": 0.0, "prediction": 3.0, "forecast_step": step,
+        }
+        for origin in ("origin_a", "origin_b")
+        for step in range(1, 31)
+    ])
+    result = per_series_rolling_origin_metrics(predictions)
+
+    assert result["MAE"].eq(3.0).all()
+    assert result["WAPE (%)"].isna().all()
+    assert result["Bias (%)"].isna().all()
+    assert result["mean_origin_WAPE (%)"].isna().all()
+    assert result["WAPE_std_across_origins (%)"].isna().all()
+
+
+def test_per_series_rolling_origin_metrics_rejects_duplicate_origin_steps():
+    from forecasting import per_series_rolling_origin_metrics
+
+    predictions = pd.DataFrame({
+        "origin": ["origin_a", "origin_a"],
+        "store": [1, 1], "item": [2, 2], "model": ["rf", "rf"],
+        "actual": [10.0, 10.0], "prediction": [11.0, 11.0],
+        "forecast_step": [1, 1],
+    })
+    with pytest.raises(ValueError, match="one row per origin-store-item-model-forecast-step"):
+        per_series_rolling_origin_metrics(predictions)
