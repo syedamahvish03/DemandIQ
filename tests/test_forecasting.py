@@ -426,3 +426,65 @@ def test_weekly_seasonal_naive_repeats_weekday_demand_in_recursive_backtest():
     assert seasonal_predictions["prediction"].tolist() == (
         seasonal_predictions["actual"].tolist()
     )
+
+
+def test_weekday_variation_diagnostic_detects_repeating_weekday_differences():
+    from forecasting import measure_weekday_demand_variation
+
+    dates = pd.date_range("2025-01-01", periods=84, freq="D")
+    weekday_demand = [10, 10, 10, 10, 10, 30, 40]
+    source = pd.DataFrame({
+        "date": dates,
+        "store": ["WEEKLY_STORE"] * len(dates),
+        "item": ["WEEKLY_ITEM"] * len(dates),
+        "sales": [weekday_demand[date.day_of_week] for date in dates],
+    })
+
+    result = measure_weekday_demand_variation(source).iloc[0]
+
+    assert result["weekday_analysis_status"] == "sufficient_history"
+    assert result["minimum_observations_per_weekday"] == 12
+    assert result["highest_mean_sales_weekday"] == "Sunday"
+    assert result["lowest_mean_sales_weekday"] == "Wednesday"
+    assert result["weekday_mean_dispersion_pct"] > 0
+
+
+def test_weekday_variation_diagnostic_handles_flat_and_zero_demand():
+    from forecasting import measure_weekday_demand_variation
+
+    dates = pd.date_range("2025-01-01", periods=56, freq="D")
+    source = pd.DataFrame([
+        {
+            "date": date,
+            "store": 1,
+            "item": item,
+            "sales": value,
+        }
+        for item, value in [("flat", 12), ("zero", 0)]
+        for date in dates
+    ])
+
+    result = measure_weekday_demand_variation(source).set_index("item")
+
+    assert result.loc["flat", "weekday_analysis_status"] == "sufficient_history"
+    assert result.loc["flat", "weekday_mean_dispersion_pct"] == pytest.approx(0)
+    assert result.loc["zero", "weekday_analysis_status"] == "no_demand"
+    assert pd.isna(result.loc["zero", "weekday_mean_dispersion_pct"])
+
+
+def test_weekday_variation_diagnostic_flags_insufficient_history():
+    from forecasting import measure_weekday_demand_variation
+
+    dates = pd.date_range("2025-01-01", periods=20, freq="D")
+    source = pd.DataFrame({
+        "date": dates,
+        "store": [1] * len(dates),
+        "item": [101] * len(dates),
+        "sales": [10] * len(dates),
+    })
+
+    result = measure_weekday_demand_variation(source).iloc[0]
+
+    assert result["weekday_analysis_status"] == "insufficient_weekday_history"
+    assert result["minimum_observations_per_weekday"] < 4
+    assert pd.isna(result["weekday_mean_dispersion_pct"])
