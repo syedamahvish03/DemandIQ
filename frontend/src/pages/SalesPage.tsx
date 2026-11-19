@@ -8,6 +8,21 @@ import { getProductCount, getSalesImports, importSalesCsv } from "../lib/salesIm
 import type { SalesImport } from "../lib/salesImports";
 import { useAuth } from "../lib/AuthContext";
 
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const detail = error as { message?: unknown; code?: unknown; details?: unknown; hint?: unknown };
+    const parts = [
+      typeof detail.message === "string" ? detail.message : "",
+      typeof detail.code === "string" ? `Code: ${detail.code}` : "",
+      typeof detail.details === "string" ? detail.details : "",
+      typeof detail.hint === "string" ? `Hint: ${detail.hint}` : "",
+    ].filter(Boolean);
+    if (parts.length) return parts.join(" — ");
+  }
+  return "An unexpected error occurred. Please try again.";
+}
+
 export default function SalesPage() {
   const { session, signOut } = useAuth();
   const [file, setFile] = useState<File | null>(null);
@@ -26,7 +41,7 @@ export default function SalesPage() {
       setImports(history);
       setProductCount(products);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load workspace data.");
+      setError(describeError(loadError));
     } finally {
       setLoadingHistory(false);
     }
@@ -64,7 +79,7 @@ export default function SalesPage() {
         setNotice("Validation passed. Review the preview and import when ready.");
       }
     } catch (validationError) {
-      setError(validationError instanceof Error ? validationError.message : "The CSV could not be validated.");
+      setError(describeError(validationError));
     } finally {
       setBusy(false);
     }
@@ -84,7 +99,7 @@ export default function SalesPage() {
       if (input) input.value = "";
       await refreshHistory();
     } catch (importError) {
-      setError(importError instanceof Error ? importError.message : "The sales data could not be imported.");
+      setError(describeError(importError));
     } finally {
       setBusy(false);
     }
