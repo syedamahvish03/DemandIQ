@@ -11,6 +11,7 @@ from forecasting import (
     evaluate_random_forest,
     forecast_future_demand,
     classify_demand_patterns,
+    measure_weekday_demand_variation,
     recursive_multi_horizon_backtest,
     rolling_origin_multi_horizon_backtest,
 )
@@ -294,6 +295,51 @@ with forecast_tab:
         )
     except ValueError as exc:
         st.warning(f"Demand pattern diagnostics are not available: {exc}")
+
+    st.divider()
+    st.subheader("Weekday demand variation")
+    st.write(
+        "This diagnostic compares each store-item's average sales across Monday to Sunday. "
+        "It reports the dispersion of those seven weekday averages only when there are at "
+        "least four observations for every weekday."
+    )
+
+    @st.cache_data(show_spinner="Measuring weekday demand variation...")
+    def run_weekday_variation_diagnostic(data: pd.DataFrame):
+        return measure_weekday_demand_variation(data)
+
+    try:
+        weekday_variation = run_weekday_variation_diagnostic(df)
+        weekday_summary = (
+            weekday_variation["weekday_analysis_status"]
+            .value_counts()
+            .rename_axis("analysis_status")
+            .reset_index(name="store_item_series")
+        )
+        st.dataframe(weekday_summary, width="stretch", hide_index=True)
+        with st.expander("View weekday variation by store and product", expanded=False):
+            st.dataframe(
+                weekday_variation.style.format({
+                    "weekday_mean_dispersion_pct": "{:.2f}"
+                }),
+                width="stretch",
+                hide_index=True,
+            )
+        st.download_button(
+            "Download weekday variation diagnostics (CSV)",
+            data=weekday_variation.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_weekday_variation_diagnostics.csv",
+            mime="text/csv",
+            key="download_weekday_variation_diagnostics",
+        )
+        st.caption(
+            "Higher dispersion means weekday average sales differ more; it is not proof of "
+            "weekly seasonality. Trends, promotions, holidays and other effects can influence "
+            "the metric. Insufficient-history and zero-demand series are reported separately. "
+            "This diagnostic does not change forecasts or inventory calculations."
+        )
+    except ValueError as exc:
+        st.warning(f"Weekday variation diagnostics are not available: {exc}")
 
     st.divider()
     st.subheader("Forecast evaluation — Simple baselines")
