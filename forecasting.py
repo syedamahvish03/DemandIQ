@@ -749,6 +749,125 @@ def per_series_rolling_origin_metrics(predictions: pd.DataFrame) -> pd.DataFrame
     ).reset_index(drop=True)
 
 
+def recommend_per_series_models(metrics: pd.DataFrame) -> pd.DataFrame:
+    """Rank candidate models per store-item and horizon using rolling-origin WAPE.
+
+    Ranking uses mean origin-level WAPE, with lower cross-origin WAPE standard
+    deviation as the tie-breaker. This is evaluation guidance only; it does not
+    change the production forecasting model.
+    """
+    required = {
+        "store", "item", "model", "horizon_days", "origins_evaluated",
+        "evaluation_rows", "WAPE (%)", "mean_origin_WAPE (%)",
+        "WAPE_std_across_origins (%)", "actual_units",
+    }
+    missing = sorted(required - set(metrics.columns))
+    if missing:
+        raise ValueError("Missing model-selection metric columns: " + ", ".join(missing))
+    if metrics.empty:
+        raise ValueError("No per-series rolling-origin metrics are available.")
+
+    frame = metrics.loc[:, list(required)].copy()
+    nullable = {"WAPE (%)", "mean_origin_WAPE (%)", "WAPE_std_across_origins (%)"}
+    required_nonnull = list(required - nullable)
+    if frame[required_nonnull].isna().any().any():
+        raise ValueError("Model-selection metrics require valid identifiers and counts.")
+    for column in (
+        "horizon_days", "origins_evaluated", "evaluation_rows",
+        "WAPE (%)", "mean_origin_WAPE (%)",
+        "WAPE_std_across_origins (%)", "actual_units",
+    ):
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    numeric_columns = [
+        "horizon_days", "origins_evaluated", "evaluation_rows",
+        "WAPE (%)", "mean_origin_WAPE (%)",
+        "WAPE_std_across_origins (%)", "actual_units",
+    ]
+    for column in numeric_columns:
+        values = frame[column].dropna().to_numpy(dtype=float)
+        if not np.isfinite(values).all():
+            raise ValueError("Model-selection metrics must contain finite numeric values.")
+    if not frame["horizon_days"].isin((7, 15, 30)).all():
+        raise ValueError("Model-selection horizons must be 7, 15 or 30 days.")
+    if (
+        frame["origins_evaluated"].lt(1).any()
+        or not frame["origins_evaluated"].mod(1).eq(0).all()
+        or frame["evaluation_rows"].lt(1).any()
+        or not frame["evaluation_rows"].mod(1).eq(0).all()
+    ):
+        raise ValueError("Model-selection origin and evaluation counts must be positive whole numbers.")
+    for column in ("WAPE (%)", "mean_origin_WAPE (%)", "WAPE_std_across_origins (%)"):
+        if frame[column].dropna().lt(0).any():
+            raise ValueError("Model-selection percentage-error metrics cannot be negative.")
+    if frame["actual_units"].lt(0).any():
+        raise ValueError("Model-selection actual demand cannot be negative.")
+    key_columns = ["store", "item", "model", "horizon_days"]
+    if frame.duplicated(key_columns).any():
+        raise ValueError("Model-selection metrics must contain one row per store-item-model-horizon.")
+
+    rows = []
+    for (store, item, horizon), group in frame.groupby(
+        ["store", "item", "horizon_days"], sort=False
+    ):
+        ranked = group.dropna(subset=["mean_origin_WAPE (%)"]).sort_values(
+            ["mean_origin_WAPE (%)", "WAPE_std_across_origins (%)", "model"],
+            na_position="last",
+        )
+        if ranked.empty:
+            rows.append({
+                "store": store,
+                "item": item,
+                "horizon_days": int(horizon),
+                "models_evaluated": int(len(group)),
+                "models_ranked": 0,
+                "recommended_model": None,
+                "runner_up_model": None,
+                "mean_origin_WAPE (%)": float("nan"),
+                "WAPE_std_across_origins (%)": float("nan"),
+                "runner_up_mean_origin_WAPE (%)": float("nan"),
+                "WAPE_gap_vs_runner_up (pp)": float("nan"),
+                "pooled_WAPE (%)": float("nan"),
+                "origins_evaluated": int(group["origins_evaluated"].max()),
+                "evaluation_rows": int(group["evaluation_rows"].max()),
+                "actual_units": float(group["actual_units"].max()),
+                "selection_status": "no_positive_demand_for_wape_ranking",
+            })
+            continue
+
+        best = ranked.iloc[0]
+        runner_up = ranked.iloc[1] if len(ranked) > 1 else None
+        rows.append({
+            "store": store,
+            "item": item,
+            "horizon_days": int(horizon),
+            "models_evaluated": int(len(group)),
+            "models_ranked": int(len(ranked)),
+            "recommended_model": best["model"],
+            "runner_up_model": runner_up["model"] if runner_up is not None else None,
+            "mean_origin_WAPE (%)": float(best["mean_origin_WAPE (%)"]),
+            "WAPE_std_across_origins (%)": float(best["WAPE_std_across_origins (%)"]),
+            "runner_up_mean_origin_WAPE (%)": (
+                float(runner_up["mean_origin_WAPE (%)"]) if runner_up is not None else float("nan")
+            ),
+            "WAPE_gap_vs_runner_up (pp)": (
+                float(runner_up["mean_origin_WAPE (%)"] - best["mean_origin_WAPE (%)"])
+                if runner_up is not None else float("nan")
+            ),
+            "pooled_WAPE (%)": float(best["WAPE (%)"]) if pd.notna(best["WAPE (%)"]) else float("nan"),
+            "origins_evaluated": int(best["origins_evaluated"]),
+            "evaluation_rows": int(best["evaluation_rows"]),
+            "actual_units": float(best["actual_units"]),
+            "selection_status": (
+                "recommended_by_mean_origin_wape"
+                if runner_up is not None else "only_one_model_with_defined_wape"
+            ),
+        })
+
+    return pd.DataFrame(rows).sort_values(
+        ["horizon_days", "store", "item"]
+    ).reset_index(drop=True)
+
+
 def rolling_origin_multi_horizon_backtest(
     data: pd.DataFrame,
     n_origins: int = 3,
