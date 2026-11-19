@@ -81,6 +81,54 @@ def build_time_features(data: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
+
+def classify_demand_patterns(data: pd.DataFrame) -> pd.DataFrame:
+    """Classify each daily store-item series using ADI and squared CV.
+
+    Uses the conventional ADI=1.32 and CV-squared=0.49 boundaries for
+    smooth, intermittent, erratic and lumpy demand. Series with no positive
+    demand or fewer than two positive observations are reported separately;
+    this diagnostic does not alter model forecasts or inventory calculations.
+    """
+    features = build_time_features(data)
+    if features.empty:
+        raise ValueError("No usable sales rows are available for demand-pattern analysis.")
+
+    rows = []
+    for (store, item), group in features.groupby(["store", "item"], sort=False):
+        values = group["sales"].astype(float)
+        positive = values.loc[values.gt(0)]
+        nonzero_days = int(len(positive))
+        observations = int(len(values))
+        adi = float(observations / nonzero_days) if nonzero_days else float("nan")
+        cv_squared = float("nan")
+        if nonzero_days == 0:
+            pattern = "no_demand"
+        elif nonzero_days < 2:
+            pattern = "insufficient_nonzero_observations"
+        else:
+            mean_positive = float(positive.mean())
+            cv_squared = float((positive.std(ddof=1) / mean_positive) ** 2)
+            if adi < 1.32:
+                pattern = "smooth" if cv_squared < 0.49 else "erratic"
+            else:
+                pattern = "intermittent" if cv_squared < 0.49 else "lumpy"
+
+        rows.append({
+            "store": store,
+            "item": item,
+            "observations": observations,
+            "nonzero_demand_days": nonzero_days,
+            "zero_demand_days": observations - nonzero_days,
+            "ADI": adi,
+            "CV_squared": cv_squared,
+            "demand_pattern": pattern,
+        })
+
+    return pd.DataFrame(rows).sort_values(
+        ["demand_pattern", "store", "item"]
+    ).reset_index(drop=True)
+
 def chronological_baseline_backtest(data: pd.DataFrame, holdout_days: int = 28):
     """Compare lag-7 seasonal naive and trailing-7-day mean on the final dates.
 
