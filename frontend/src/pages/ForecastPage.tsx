@@ -7,6 +7,7 @@ import { downloadCsv } from "../lib/csv";
 import ForecastTrend from "../components/ForecastTrend";
 import type { ForecastResult } from "../lib/api";
 import { saveForecastAnalysis } from "../lib/analysisRuns";
+import { getWorkspaceSalesFile } from "../lib/workspaceSales";
 
 export default function ForecastPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -15,6 +16,22 @@ export default function ForecastPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+
+  async function handleWorkspaceSalesLoad() {
+    setWorkspaceLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const source = await getWorkspaceSalesFile();
+      setFile(source.file);
+      setSaveMessage("");
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Workspace sales data could not be loaded.");
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,12 +77,15 @@ export default function ForecastPage() {
         <div className="forecast-heading">
           <span className="forecast-eyebrow"><BarChart3 size={15} /> DEMAND PLANNING</span>
           <h1>Generate a demand forecast</h1>
-          <p>Upload your historical daily sales data. DemandIQ validates the file and uses its forecasting model to estimate future demand.</p>
+          <p>Use sales already imported into your private workspace, or upload a separate CSV. DemandIQ validates the data and uses its forecasting model to estimate future demand.</p>
         </div>
 
         <section className="forecast-card">
           <form onSubmit={handleSubmit}>
-            <label className="forecast-field-label" htmlFor="sales-file">Historical sales CSV</label>
+            <label className="forecast-field-label" htmlFor="sales-file">Historical sales data</label>
+            <button type="button" className="button button-quiet button-small" onClick={handleWorkspaceSalesLoad} disabled={workspaceLoading || loading}>
+              {workspaceLoading ? <><LoaderCircle className="forecast-spinner" size={15}/> Loading workspace sales…</> : "Use imported workspace sales"}
+            </button>
             <label className="forecast-upload" htmlFor="sales-file">
               <UploadCloud size={25} />
               <strong>{file ? file.name : "Choose a CSV file"}</strong>
