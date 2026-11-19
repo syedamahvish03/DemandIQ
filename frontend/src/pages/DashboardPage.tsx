@@ -5,6 +5,7 @@ import { useAuth } from "../lib/AuthContext";
 const workspaceLinks = [
   { to: "/workspace", label: "Overview", icon: BarChart3, end: true },
   { to: "/workspace/sales", label: "Sales & imports", icon: FileUp },
+  { to: "/workspace/products", label: "Product catalogue", icon: PackageSearch },
   { to: "/workspace/forecasts", label: "Demand forecasts", icon: LineChart },
   { to: "/workspace/inventory", label: "Inventory planning", icon: Boxes },
   { to: "/workspace/analyses", label: "Saved analyses", icon: Clock3 },
