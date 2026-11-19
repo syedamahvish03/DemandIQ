@@ -285,3 +285,44 @@ def test_rolling_origin_backtest_rejects_invalid_training_cap():
         rolling_origin_multi_horizon_backtest(
             sample_daily_sales(days=90), n_origins=3, max_train_rows=0
         )
+
+
+def test_feature_builder_rejects_non_finite_sales():
+    source = sample_daily_sales()
+    source.loc[source.index[0], "sales"] = float("inf")
+
+    with pytest.raises(ValueError, match="finite numbers"):
+        build_time_features(source)
+
+
+def test_feature_builder_rejects_negative_sales():
+    source = sample_daily_sales()
+    source.loc[source.index[0], "sales"] = -1
+
+    with pytest.raises(ValueError, match="non-negative"):
+        build_time_features(source)
+
+
+def test_feature_builder_rejects_blank_identifiers():
+    source = sample_daily_sales()
+    source.loc[source.index[0], "store"] = "   "
+
+    with pytest.raises(ValueError, match="nonblank store/item identifiers"):
+        build_time_features(source)
+
+
+def test_feature_builder_rejects_duplicate_calendar_days():
+    source = sample_daily_sales()
+    duplicate = source.iloc[[0]].copy()
+    duplicate["date"] = duplicate["date"] + pd.Timedelta(hours=12)
+    source = pd.concat([source, duplicate], ignore_index=True)
+
+    with pytest.raises(ValueError, match="one sales row per date"):
+        build_time_features(source)
+
+
+def test_feature_builder_rejects_irregular_daily_series():
+    source = sample_daily_sales().drop(index=5)
+
+    with pytest.raises(ValueError, match="missing or irregular dates"):
+        build_time_features(source)
