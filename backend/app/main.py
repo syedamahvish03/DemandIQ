@@ -153,6 +153,7 @@ def _read_csv_upload(raw_bytes: bytes, label: str) -> pd.DataFrame:
 @app.post("/api/v1/sales/validate", tags=["Sales"])
 async def validate_sales_upload(
     file: UploadFile = File(..., description="Historical sales CSV file to preview before import"),
+    include_records: bool = False,
 ) -> dict:
     """Validate a sales CSV and return a safe preview without persisting uploaded data."""
     if not (file.filename or "").strip().lower().endswith(".csv"):
@@ -173,7 +174,7 @@ async def validate_sales_upload(
             "Duplicate store-item calendar dates must be resolved before importing this file."
         )
 
-    return {
+    response = {
         "status": "success",
         "can_import": not blocking_issues and quality_report["rows_valid"] > 0,
         "preview_limit": 20,
@@ -182,6 +183,11 @@ async def validate_sales_upload(
         "blocking_issues": blocking_issues,
         "excluded_rows": quality_report["rows_received"] - quality_report["rows_valid"],
     }
+    if include_records and response["can_import"]:
+        all_records = cleaned_sales.copy()
+        all_records["date"] = pd.to_datetime(all_records["date"]).dt.strftime("%Y-%m-%d")
+        response["validated_rows"] = all_records.to_dict(orient="records")
+    return response
 
 
 @app.post("/api/v1/inventory/template", tags=["Inventory"])
