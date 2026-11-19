@@ -26,7 +26,7 @@ def build_time_features(data: pd.DataFrame) -> pd.DataFrame:
         frame[column] = frame[column].map(
             lambda value: value.strip() if isinstance(value, str) else value
         )
-    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame["date"] = pd.to_datetime(frame["date"], format="mixed", errors="coerce")
     frame["sales"] = pd.to_numeric(frame["sales"], errors="coerce")
 
     blank_identifiers = frame[["store", "item"]].apply(
@@ -245,7 +245,7 @@ def forecast_future_demand(
         raise ValueError("No usable sales rows are available for forecasting.")
 
     frame = data.loc[:, list(REQUIRED_COLUMNS)].copy()
-    frame["date"] = pd.to_datetime(frame["date"], errors="coerce").dt.normalize()
+    frame["date"] = pd.to_datetime(frame["date"], format="mixed", errors="coerce").dt.normalize()
     frame["sales"] = pd.to_numeric(frame["sales"], errors="coerce")
     frame = frame.dropna(subset=["date", "store", "item", "sales"])
     if frame.duplicated(["store", "item", "date"]).any():
@@ -365,7 +365,7 @@ def recursive_multi_horizon_backtest(
         raise ValueError("No sales rows are available for multi-horizon backtesting.")
 
     frame = data.loc[:, list(REQUIRED_COLUMNS)].copy()
-    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame["date"] = pd.to_datetime(frame["date"], format="mixed", errors="coerce")
     frame["sales"] = pd.to_numeric(frame["sales"], errors="coerce")
     if frame[["date", "store", "item", "sales"]].isna().any().any():
         raise ValueError(
@@ -559,7 +559,7 @@ def rolling_origin_multi_horizon_backtest(
         raise ValueError("No sales rows are available for rolling-origin backtesting.")
 
     frame = data.loc[:, list(REQUIRED_COLUMNS)].copy()
-    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame["date"] = pd.to_datetime(frame["date"], format="mixed", errors="coerce")
     frame["sales"] = pd.to_numeric(frame["sales"], errors="coerce")
     if frame[["date", "store", "item", "sales"]].isna().any().any():
         raise ValueError(
