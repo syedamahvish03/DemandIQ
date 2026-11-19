@@ -6,6 +6,7 @@ import AnalysesPage from "./pages/AnalysesPage";
 import DashboardPage from "./pages/DashboardPage";
 import SalesPage from "./pages/SalesPage";
 import ProductsPage from "./pages/ProductsPage";
+import SuppliersPage from "./pages/SuppliersPage";
 import AuthPage from "./components/AuthPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Link, Route, Routes } from "react-router-dom";
@@ -163,6 +164,7 @@ export default function App() {
     <Route path="/workspace" element={<ProtectedRoute><DashboardPage/></ProtectedRoute>}/>
     <Route path="/workspace/sales" element={<ProtectedRoute><SalesPage/></ProtectedRoute>}/>
     <Route path="/workspace/products" element={<ProtectedRoute><ProductsPage/></ProtectedRoute>}/>
+    <Route path="/workspace/suppliers" element={<ProtectedRoute><SuppliersPage/></ProtectedRoute>}/>
     <Route path="/workspace/forecasts" element={<ProtectedRoute><ForecastPage/></ProtectedRoute>}/>
     <Route path="/workspace/inventory" element={<ProtectedRoute><InventoryPage/></ProtectedRoute>}/>
     <Route path="/workspace/analyses" element={<ProtectedRoute><AnalysesPage/></ProtectedRoute>}/>
