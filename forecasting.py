@@ -29,7 +29,15 @@ def build_time_features(data: pd.DataFrame) -> pd.DataFrame:
     frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
     frame["sales"] = pd.to_numeric(frame["sales"], errors="coerce")
 
-    if frame[["date", "store", "item", "sales"]].isna().any().any():
+    blank_identifiers = frame[["store", "item"]].apply(
+        lambda column: column.map(
+            lambda value: isinstance(value, str) and not value
+        )
+    )
+    if (
+        frame[["date", "store", "item", "sales"]].isna().any().any()
+        or blank_identifiers.any(axis=1).any()
+    ):
         raise ValueError(
             "Forecasting requires valid dates, nonblank store/item identifiers "
             "and numeric sales. Clean invalid rows before feature engineering."
