@@ -189,7 +189,16 @@ def calculate_inventory_recommendations(
     result["recommended_order_qty"] = (
         result["target_stock"] - result["inventory_position"]
     ).clip(lower=0).apply(np.ceil).astype(int)
-    result["reorder_required"] = result["inventory_position"] <= result["reorder_point"]
+    # Do not flag replenishment when the selected demand basis is entirely zero.
+    # In forecast mode, future demand overrides historical demand for this decision.
+    demand_signal = (
+        result["forecast_protection_demand"].gt(0)
+        if demand_forecast is not None
+        else result["avg_daily_demand"].gt(0)
+    )
+    result["reorder_required"] = (
+        demand_signal & result["inventory_position"].le(result["reorder_point"])
+    )
 
     result = result.sort_values(
         ["recommended_order_qty", "avg_daily_demand"],
