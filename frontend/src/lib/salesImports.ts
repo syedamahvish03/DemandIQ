@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { validateSalesCsv } from "./api";
 import type { SalesValidationResult } from "./api";
 
 export type SalesImport = {
@@ -53,13 +54,11 @@ export async function importSalesCsv(
   if (!validation.can_import) {
     throw new Error("Resolve the blocking validation issues before importing this file.");
   }
-  const { validated_rows: rows } = await import("./api").then(async ({ validateSalesCsv }) => {
-    const fullValidation = await validateSalesCsv(file, true);
-    if (!fullValidation.can_import || !fullValidation.validated_rows?.length) {
-      throw new Error("The file could not be revalidated for import. Please validate it again.");
-    }
-    return fullValidation;
-  });
+  const fullValidation = await validateSalesCsv(file, true);
+  if (!fullValidation.can_import || !fullValidation.validated_rows?.length) {
+    throw new Error("The file could not be revalidated for import. Please validate it again.");
+  }
+  const rows = fullValidation.validated_rows;
   if (!rows?.length) throw new Error("No valid sales rows were available to import.");
 
   const { user, workspace } = await getWorkspaceContext();
