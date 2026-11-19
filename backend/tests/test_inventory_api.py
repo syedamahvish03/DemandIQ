@@ -4,7 +4,7 @@ from io import BytesIO
 import pandas as pd
 from fastapi.testclient import TestClient
 
-from backend.app.main import app
+from backend.app.main import MAX_UPLOAD_BYTES, app
 
 client = TestClient(app)
 
@@ -91,3 +91,43 @@ def test_inventory_recommendations_reject_negative_stock():
     )
     assert response.status_code == 422
     assert "cannot be negative" in response.json()["detail"]
+
+
+
+def test_inventory_template_rejects_sales_upload_over_size_limit():
+    oversized_csv = b"x" * (MAX_UPLOAD_BYTES + 1)
+    response = client.post(
+        "/api/v1/inventory/template",
+        files={"sales_file": ("sales.csv", BytesIO(oversized_csv), "text/csv")},
+    )
+
+    assert response.status_code == 413
+    assert "10 MB upload limit" in response.json()["detail"]
+
+
+def test_inventory_recommendations_reject_oversized_sales_upload():
+    oversized_csv = b"x" * (MAX_UPLOAD_BYTES + 1)
+    response = client.post(
+        "/api/v1/inventory/recommendations",
+        files={
+            "sales_file": ("sales.csv", BytesIO(oversized_csv), "text/csv"),
+            "inventory_file": ("inventory.csv", BytesIO(inventory_csv()), "text/csv"),
+        },
+    )
+
+    assert response.status_code == 413
+    assert "10 MB upload limit" in response.json()["detail"]
+
+
+def test_inventory_recommendations_reject_oversized_inventory_upload():
+    oversized_csv = b"x" * (MAX_UPLOAD_BYTES + 1)
+    response = client.post(
+        "/api/v1/inventory/recommendations",
+        files={
+            "sales_file": ("sales.csv", BytesIO(sales_csv()), "text/csv"),
+            "inventory_file": ("inventory.csv", BytesIO(oversized_csv), "text/csv"),
+        },
+    )
+
+    assert response.status_code == 413
+    assert "10 MB upload limit" in response.json()["detail"]
