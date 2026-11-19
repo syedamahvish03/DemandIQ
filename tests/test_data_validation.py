@@ -85,3 +85,19 @@ def test_blank_identifiers_are_excluded_and_text_identifiers_are_trimmed():
     assert report["missing_identifiers"] == 2
     assert report["rows_valid"] == 1
     assert any("missing store or item identifier" in warning for warning in report["warnings"])
+
+
+
+def test_duplicate_daily_keys_with_different_sales_are_flagged():
+    source = pd.DataFrame({
+        "date": ["2025-01-01 09:00:00", "2025-01-01 18:00:00", "2025-01-02"],
+        "store": ["STORE_A", "STORE_A", "STORE_A"],
+        "item": ["ITEM_1", "ITEM_1", "ITEM_1"],
+        "sales": [10, 15, 12],
+    })
+
+    cleaned, report = validate_sales_data(source)
+
+    assert len(cleaned) == 3
+    assert report["duplicate_rows"] == 1
+    assert any("duplicate daily store-item date" in warning for warning in report["warnings"])
