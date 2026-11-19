@@ -1,0 +1,14 @@
+{
+  "id": "/",
+  "name": "DemandIQ — Retail Demand Forecasting",
+  "short_name": "DemandIQ",
+  "description": "Retail demand forecasting and inventory planning workspace.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8f9fc",
+  "theme_color": "#0b1020",
+  "icons": [
+    { "src": "/demandiq-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
