@@ -13,13 +13,16 @@ saved forecast and inventory results.
    `migrations/20261119000100_create_user_workspaces.sql` from this repository.
 5. Paste the SQL into the editor and click **Run**.
 6. Confirm the query completes without an error.
+7. Repeat the same process with `migrations/20261119000200_create_sales_import_foundation.sql`.
+8. Confirm both migrations complete successfully before testing Sales & imports or Product catalogue.
 
-The migration:
-- creates `public.workspaces` and `public.analysis_runs`;
-- backfills a personal workspace for existing Auth users;
-- creates a personal workspace automatically for future signups;
-- enables Row Level Security and owner-scoped policies;
-- stores analysis results as JSONB, not original uploaded CSV files.
+The migrations:
+- create `public.workspaces` and `public.analysis_runs`;
+- backfill a personal workspace for existing Auth users and create one for future signups;
+- create workspace-scoped `public.products`, `public.sales_imports`, and `public.sales_records`;
+- enforce owner-scoped Row Level Security and foreign-key relationships;
+- create a private `sales-imports` Storage bucket with owner-folder policies;
+- preserve uploaded CSV source files privately and store import counts and validation metadata.
 
 ## Security model
 
@@ -31,7 +34,8 @@ analysis run from being attached to another user's workspace.
 
 ## Current implementation boundary
 
-This migration creates the database foundation. It does not, by itself, add
-save/history UI or make the frontend write analysis results. Those application
-changes are a separate step and should be tested after this migration has been
-applied to the Supabase project.
+The SQL files must be applied manually in the Supabase SQL Editor; pushing the
+migration files to GitHub does not execute them. The frontend import and
+catalogue screens require the second migration. Apply both migrations in
+filename order, then test the workflows with a non-production/sample CSV first.
+Original source files are private and accessible only to their owning account.
