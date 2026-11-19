@@ -90,7 +90,7 @@ def test_blank_identifiers_are_excluded_and_text_identifiers_are_trimmed():
 
 def test_duplicate_daily_keys_with_different_sales_are_flagged():
     source = pd.DataFrame({
-        "date": ["2025-01-01 09:00:00", "2025-01-01 18:00:00", "2025-01-02"],
+        "date": ["2025-01-01 09:00:00", "2025-01-01 18:00:00", "2025-01-02 00:00:00"],
         "store": ["STORE_A", "STORE_A", "STORE_A"],
         "item": ["ITEM_1", "ITEM_1", "ITEM_1"],
         "sales": [10, 15, 12],
