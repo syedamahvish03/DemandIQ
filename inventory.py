@@ -49,8 +49,8 @@ def calculate_inventory_recommendations(
         )
     if lookback_days < 1:
         raise ValueError("lookback_days must be at least 1")
-    if service_level_z < 0:
-        raise ValueError("service_level_z cannot be negative")
+    if not np.isfinite(service_level_z) or service_level_z < 0:
+        raise ValueError("service_level_z must be a finite, non-negative number")
 
     stock = inventory_data.loc[:, list(INVENTORY_COLUMNS)].copy()
     if stock.duplicated(["store", "item"]).any():
@@ -68,8 +68,13 @@ def calculate_inventory_recommendations(
         return pd.DataFrame(), {"excluded_input_rows": excluded_rows, "lookback_days": lookback_days}
 
     nonnegative_columns = ["on_hand", "on_order", "backorders", "lead_time_days", "review_period_days"]
+    if not np.isfinite(complete[numeric_columns].to_numpy(dtype=float)).all():
+        raise ValueError("Complete inventory inputs must contain finite numbers.")
     if (complete[nonnegative_columns] < 0).any().any():
         raise ValueError("Stock, order, backorder and time inputs cannot be negative.")
+    day_columns = ["lead_time_days", "review_period_days"]
+    if (complete[day_columns] % 1 != 0).any().any():
+        raise ValueError("lead_time_days and review_period_days must be whole numbers of days.")
     if (complete["lead_time_days"] <= 0).any():
         raise ValueError("lead_time_days must be greater than zero.")
     if (complete["review_period_days"] <= 0).any():
@@ -126,6 +131,12 @@ def calculate_inventory_recommendations(
             raise ValueError("Demand forecast must contain one row per date and store-item pair.")
 
         forecast = forecast.sort_values(["store", "item", "date"])
+        for key, group in forecast.groupby(["store", "item"], sort=False):
+            if group["date"].diff().dropna().ne(pd.Timedelta(days=1)).any():
+                raise ValueError(
+                    f"Forecast dates must be consecutive daily observations for "
+                    f"store {key[0]}, item {key[1]}."
+                )
         forecast_groups = {
             key: group["forecast_sales"].to_numpy(dtype=float)
             for key, group in forecast.groupby(["store", "item"], sort=False)
