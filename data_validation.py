@@ -31,6 +31,12 @@ def validate_sales_data(data: pd.DataFrame):
         return pd.DataFrame(columns=REQUIRED_COLUMNS), report
 
     df = df.loc[:, list(REQUIRED_COLUMNS)].copy()
+    # Normalize textual identifiers and treat empty/whitespace-only values as missing.
+    for column in ("store", "item"):
+        df[column] = df[column].map(
+            lambda value: value.strip() if isinstance(value, str) else value
+        )
+
     parsed_dates = pd.to_datetime(df["date"], errors="coerce")
     numeric_sales = pd.to_numeric(df["sales"], errors="coerce")
     invalid_dates = parsed_dates.isna()
@@ -40,7 +46,14 @@ def validate_sales_data(data: pd.DataFrame):
     )
     invalid_sales = numeric_sales.isna() | ~finite_sales
     negative_sales = numeric_sales.lt(0).fillna(False) & finite_sales
-    missing_identifiers = df["store"].isna() | df["item"].isna()
+    blank_identifiers = df[["store", "item"]].apply(
+        lambda column: column.map(
+            lambda value: isinstance(value, str) and not value.strip()
+        )
+    )
+    missing_identifiers = (
+        df["store"].isna() | df["item"].isna() | blank_identifiers.any(axis=1)
+    )
 
     report["invalid_dates"] = int(invalid_dates.sum())
     report["invalid_sales"] = int(invalid_sales.sum())
