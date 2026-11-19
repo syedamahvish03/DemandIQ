@@ -6,6 +6,7 @@ import { generateForecast } from "../lib/api";
 import { downloadCsv } from "../lib/csv";
 import ForecastTrend from "../components/ForecastTrend";
 import type { ForecastResult } from "../lib/api";
+import { saveForecastAnalysis } from "../lib/analysisRuns";
 
 export default function ForecastPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -13,6 +14,7 @@ export default function ForecastPage() {
   const [result, setResult] = useState<ForecastResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -27,10 +29,19 @@ export default function ForecastPage() {
 
     setLoading(true);
     setError("");
+    setSaveMessage("");
     setResult(null);
     try {
       const forecast = await generateForecast(file, horizon);
       setResult(forecast);
+      try {
+        await saveForecastAnalysis(forecast, file.name);
+        setSaveMessage("This forecast has been saved to your private workspace.");
+      } catch (saveError) {
+        setSaveMessage(saveError instanceof Error
+          ? `Forecast generated, but cloud saving failed: ${saveError.message}`
+          : "Forecast generated, but it could not be saved to your cloud workspace.");
+      }
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -99,6 +110,7 @@ export default function ForecastPage() {
 
         {result && (
           <section className="forecast-results" aria-live="polite">
+            {saveMessage && <div className={saveMessage.startsWith("This forecast") ? "analysis-save-notice" : "analysis-save-warning"} role="status">{saveMessage}</div>}
             <div className="forecast-result-heading">
               <div><span className="forecast-eyebrow">MODEL RESULTS</span><h2>Your demand forecast is ready</h2></div>
               <div className="forecast-result-actions">
