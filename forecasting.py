@@ -717,15 +717,15 @@ def forecast_accuracy_by_demand_pattern(
         lambda column: column.str.strip().eq("")
     ).any(axis=1).any():
         raise ValueError("Store, item and model identifiers must be nonblank.")
-    if frame.duplicated(["date", "store", "item", "model"]).any():
-        raise ValueError("Demand-pattern evaluation requires one row per date-store-item-model.")
-
     origin_dates = (
         frame["date"] - pd.to_timedelta(frame["forecast_step"], unit="D")
     ).drop_duplicates()
     if len(origin_dates) != 1:
         raise ValueError("Demand-pattern evaluation requires predictions from one common forecast origin.")
     origin = origin_dates.iloc[0]
+
+    if frame.duplicated(["date", "store", "item", "model"]).any():
+        raise ValueError("Demand-pattern evaluation requires one row per date-store-item-model.")
 
     history = historical_data.loc[:, list(REQUIRED_COLUMNS)].copy()
     history["date"] = pd.to_datetime(history["date"], format="mixed", errors="coerce").dt.normalize()
