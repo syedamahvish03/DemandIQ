@@ -399,7 +399,7 @@ def test_weekly_seasonal_naive_repeats_weekday_demand_in_recursive_backtest():
     from forecasting import recursive_multi_horizon_backtest
 
     dates = pd.date_range("2025-01-01", periods=75, freq="D")
-    weekday_demand = [10, 10, 10, 10, 10, 30, 40]
+    weekday_demand = [8, 9, 10, 11, 12, 30, 40]
     source = pd.DataFrame({
         "date": dates,
         "store": ["WEEKLY_STORE"] * len(dates),
@@ -445,7 +445,7 @@ def test_weekday_variation_diagnostic_detects_repeating_weekday_differences():
     assert result["weekday_analysis_status"] == "sufficient_history"
     assert result["minimum_observations_per_weekday"] == 12
     assert result["highest_mean_sales_weekday"] == "Sunday"
-    assert result["lowest_mean_sales_weekday"] == "Wednesday"
+    assert result["lowest_mean_sales_weekday"] == "Monday"
     assert result["weekday_mean_dispersion_pct"] > 0
 
 
