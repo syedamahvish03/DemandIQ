@@ -14,6 +14,7 @@ from forecasting import (
     measure_weekday_demand_variation,
     per_series_forecast_metrics,
     per_series_rolling_origin_metrics,
+    recommend_per_series_models,
     recursive_multi_horizon_backtest,
     rolling_origin_multi_horizon_backtest,
 )
@@ -638,6 +639,49 @@ with forecast_tab:
             "origins. Mean and standard deviation of origin WAPE show how accuracy varies by "
             "forecast date; zero-demand origins are excluded from percentage-error stability "
             "statistics. Overlapping holdout windows are not independent."
+        )
+
+        st.subheader("Per-product model selection guidance")
+        st.write(
+            "For each store-product and forecast horizon, DemandIQ ranks the evaluated models "
+            "by mean WAPE across historical origins. Lower is better; cross-origin variability "
+            "breaks ties. This is a recommendation from backtest evidence, not an automatic "
+            "change to the production forecast model."
+        )
+        model_recommendations = recommend_per_series_models(per_series_rolling)
+        recommendation_horizon = st.selectbox(
+            "Forecast horizon for model recommendations",
+            [7, 15, 30],
+            index=0,
+            format_func=lambda days: f"{days} days",
+            key="per_series_model_recommendation_horizon",
+        )
+        horizon_recommendations = model_recommendations.loc[
+            model_recommendations["horizon_days"] == recommendation_horizon
+        ]
+        st.dataframe(
+            horizon_recommendations.style.format({
+                "mean_origin_WAPE (%)": "{:.2f}",
+                "WAPE_std_across_origins (%)": "{:.2f}",
+                "runner_up_mean_origin_WAPE (%)": "{:.2f}",
+                "WAPE_gap_vs_runner_up (pp)": "{:.2f}",
+                "pooled_WAPE (%)": "{:.2f}",
+                "actual_units": "{:,.1f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.download_button(
+            "Download per-product model recommendations (CSV)",
+            data=model_recommendations.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_per_product_model_recommendations.csv",
+            mime="text/csv",
+            key="download_per_series_model_recommendations",
+        )
+        st.caption(
+            "A recommendation is unavailable when every candidate's percentage-error metric "
+            "is undefined, such as a series with zero actual demand across all evaluated origins. "
+            "Validate recommendations on additional history before operational use."
         )
         st.download_button(
             "Download rolling-origin evaluation (CSV)",
