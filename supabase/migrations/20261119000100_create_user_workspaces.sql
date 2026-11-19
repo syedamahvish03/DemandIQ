@@ -104,6 +104,8 @@ begin
 end;
 $$;
 
+revoke all on function public.create_demandiq_workspace_for_new_user() from public, anon, authenticated;
+
 drop trigger if exists on_auth_user_created_create_demandiq_workspace on auth.users;
 create trigger on_auth_user_created_create_demandiq_workspace
     after insert on auth.users
