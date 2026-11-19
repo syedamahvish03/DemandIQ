@@ -154,3 +154,53 @@ def test_forecast_inventory_rejects_duplicate_daily_predictions():
             inventory_fixture(),
             demand_forecast=forecast,
         )
+
+
+
+def test_inventory_rejects_non_finite_stock_inputs():
+    invalid = inventory_fixture()
+    invalid.loc[0, "on_hand"] = float("inf")
+    with pytest.raises(ValueError, match="finite numbers"):
+        calculate_inventory_recommendations(sales_fixture(), invalid)
+
+
+def test_inventory_rejects_fractional_supplier_time_days():
+    invalid = inventory_fixture()
+    invalid.loc[0, "lead_time_days"] = 2.5
+    with pytest.raises(ValueError, match="whole numbers of days"):
+        calculate_inventory_recommendations(sales_fixture(), invalid)
+
+
+def test_forecast_inventory_rejects_non_consecutive_forecast_dates():
+    forecast = pd.DataFrame({
+        "date": [
+            pd.Timestamp("2025-01-29"),
+            pd.Timestamp("2025-01-30"),
+            pd.Timestamp("2025-02-01"),
+            *pd.date_range("2025-02-02", periods=7, freq="D"),
+        ],
+        "store": [1] * 10,
+        "item": [101] * 10,
+        "forecast_sales": [20.0] * 10,
+    })
+    with pytest.raises(ValueError, match="consecutive daily observations"):
+        calculate_inventory_recommendations(
+            sales_fixture(),
+            inventory_fixture(),
+            demand_forecast=forecast,
+        )
+
+
+def test_forecast_inventory_rejects_infinite_predictions():
+    forecast = pd.DataFrame({
+        "date": pd.date_range("2025-01-29", periods=10, freq="D"),
+        "store": [1] * 10,
+        "item": [101] * 10,
+        "forecast_sales": [20.0] * 9 + [float("inf")],
+    })
+    with pytest.raises(ValueError, match="invalid dates, identifiers or values"):
+        calculate_inventory_recommendations(
+            sales_fixture(),
+            inventory_fixture(),
+            demand_forecast=forecast,
+        )
