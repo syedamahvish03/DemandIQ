@@ -13,6 +13,7 @@ from forecasting import (
     classify_demand_patterns,
     measure_weekday_demand_variation,
     per_series_forecast_metrics,
+    per_series_rolling_origin_metrics,
     recursive_multi_horizon_backtest,
     rolling_origin_multi_horizon_backtest,
 )
@@ -600,6 +601,43 @@ with forecast_tab:
             }),
             width="stretch",
             hide_index=True,
+        )
+        st.subheader("Rolling-origin forecast accuracy by store and product")
+        per_series_rolling = per_series_rolling_origin_metrics(rolling_predictions)
+        rolling_models = sorted(per_series_rolling["model"].unique().tolist())
+        selected_rolling_model = st.selectbox(
+            "Model for store-product rolling-origin analysis",
+            rolling_models,
+            key="rolling_origin_series_model",
+        )
+        selected_rolling_series = per_series_rolling.loc[
+            per_series_rolling["model"] == selected_rolling_model
+        ]
+        st.dataframe(
+            selected_rolling_series.style.format({
+                "MAE": "{:,.2f}",
+                "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}",
+                "Bias (%)": "{:.2f}",
+                "mean_origin_WAPE (%)": "{:.2f}",
+                "WAPE_std_across_origins (%)": "{:.2f}",
+                "actual_units": "{:,.1f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.download_button(
+            "Download store-product rolling-origin metrics (CSV)",
+            data=per_series_rolling.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_store_product_rolling_origin_metrics.csv",
+            mime="text/csv",
+            key="download_store_product_rolling_origin_metrics",
+        )
+        st.caption(
+            "These per-series scores combine recursive forecast errors across the historical "
+            "origins. Mean and standard deviation of origin WAPE show how accuracy varies by "
+            "forecast date; zero-demand origins are excluded from percentage-error stability "
+            "statistics. Overlapping holdout windows are not independent."
         )
         st.download_button(
             "Download rolling-origin evaluation (CSV)",
