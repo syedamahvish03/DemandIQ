@@ -835,3 +835,61 @@ def test_demand_pattern_forecast_metrics_reject_mixed_forecast_origins():
     with pytest.raises(ValueError, match="one common forecast origin"):
         forecast_accuracy_by_demand_pattern(predictions, history)
 
+
+
+def test_empirical_error_bands_by_step_calculates_signed_residual_quantiles():
+    from forecasting import empirical_error_bands_by_step
+
+    rows = []
+    errors = [-10, -5, -2, -1, 0, 1, 2, 5, 10, 12]
+    for index, error in enumerate(errors):
+        rows.append({
+            "origin": f"origin-{index}",
+            "store": 1,
+            "item": 101,
+            "model": "random_forest",
+            "actual": 100 + error,
+            "prediction": 100,
+            "forecast_step": 1,
+        })
+    result = empirical_error_bands_by_step(
+        pd.DataFrame(rows), lower_quantile=0.1, upper_quantile=0.9, min_samples=10
+    )
+    assert result.loc[0, "sample_count"] == 10
+    assert result.loc[0, "lower_error_bound"] == pytest.approx(-5.9)
+    assert result.loc[0, "upper_error_bound"] == pytest.approx(10.2)
+    assert result.loc[0, "calibration_status"] == "sufficient_history"
+
+
+def test_empirical_error_bands_by_step_flags_insufficient_samples():
+    from forecasting import empirical_error_bands_by_step
+
+    predictions = pd.DataFrame([{
+        "origin": "2025-01-01", "store": 1, "item": 101,
+        "model": "random_forest", "actual": 10, "prediction": 8,
+        "forecast_step": 1,
+    }])
+    result = empirical_error_bands_by_step(predictions, min_samples=20)
+    assert result.loc[0, "calibration_status"] == "insufficient_history"
+    assert pd.isna(result.loc[0, "lower_error_bound"])
+    assert pd.isna(result.loc[0, "upper_error_bound"])
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"lower_quantile": 0.95, "upper_quantile": 0.05},
+        {"lower_quantile": -0.1, "upper_quantile": 0.95},
+        {"min_samples": 0},
+    ],
+)
+def test_empirical_error_bands_by_step_rejects_invalid_configuration(kwargs):
+    from forecasting import empirical_error_bands_by_step
+
+    predictions = pd.DataFrame([{
+        "origin": "2025-01-01", "store": 1, "item": 101,
+        "model": "random_forest", "actual": 10, "prediction": 8,
+        "forecast_step": 1,
+    }])
+    with pytest.raises(ValueError):
+        empirical_error_bands_by_step(predictions, **kwargs)
