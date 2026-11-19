@@ -382,10 +382,14 @@ def test_demand_pattern_diagnostics_classify_smooth_intermittent_erratic_lumpy_a
 def test_demand_pattern_diagnostics_flags_single_nonzero_observation():
     from forecasting import classify_demand_patterns
 
-    source = sample_daily_sales(days=50)
-    source.loc[:, "sales"] = 0
-    source.loc[source.index[0], "sales"] = 5
+    dates = pd.date_range("2025-01-01", periods=50, freq="D")
+    source = pd.DataFrame({
+        "date": dates,
+        "store": [1] * 50,
+        "item": [101] * 50,
+        "sales": [5] + [0] * 49,
+    })
 
     result = classify_demand_patterns(source)
 
-    assert result["demand_pattern"].eq("insufficient_nonzero_observations").all()
+    assert result.loc[0, "demand_pattern"] == "insufficient_nonzero_observations"
