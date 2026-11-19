@@ -310,3 +310,38 @@ def test_forecast_inventory_rejects_a_missing_store_product_series():
             demand_forecast=forecast,
         )
 
+
+
+
+def test_zero_historical_demand_does_not_trigger_replenishment():
+    sales = sales_fixture()
+    sales.loc[sales["item"] == 101, "sales"] = 0
+    inventory = inventory_fixture()
+    inventory.loc[0, ["on_hand", "on_order", "backorders"]] = [0, 0, 0]
+
+    result, _ = calculate_inventory_recommendations(sales, inventory)
+    row = result.iloc[0]
+
+    assert row["avg_daily_demand"] == 0
+    assert row["recommended_order_qty"] == 0
+    assert bool(row["reorder_required"]) is False
+
+
+def test_zero_future_forecast_does_not_trigger_replenishment():
+    forecast = pd.DataFrame({
+        "date": pd.date_range("2025-01-29", periods=10, freq="D"),
+        "store": [1] * 10,
+        "item": [101] * 10,
+        "forecast_sales": [0.0] * 10,
+    })
+    inventory = inventory_fixture()
+    inventory.loc[0, ["on_hand", "on_order", "backorders"]] = [0, 0, 0]
+
+    result, _ = calculate_inventory_recommendations(
+        sales_fixture(), inventory, demand_forecast=forecast
+    )
+    row = result.iloc[0]
+
+    assert row["forecast_protection_demand"] == 0
+    assert row["recommended_order_qty"] == 0
+    assert bool(row["reorder_required"]) is False
