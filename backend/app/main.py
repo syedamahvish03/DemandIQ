@@ -150,6 +150,40 @@ def _read_csv_upload(raw_bytes: bytes, label: str) -> pd.DataFrame:
     return frame
 
 
+@app.post("/api/v1/sales/validate", tags=["Sales"])
+async def validate_sales_upload(
+    file: UploadFile = File(..., description="Historical sales CSV file to preview before import"),
+) -> dict:
+    """Validate a sales CSV and return a safe preview without persisting uploaded data."""
+    if not (file.filename or "").strip().lower().endswith(".csv"):
+        raise HTTPException(status_code=415, detail="Please upload a CSV file.")
+
+    raw_bytes = await file.read(MAX_UPLOAD_BYTES + 1)
+    sales_frame = _read_csv_upload(raw_bytes, "sales")
+    cleaned_sales, quality_report = validate_sales_data(sales_frame)
+
+    preview = cleaned_sales.head(20).copy()
+    if not preview.empty:
+        preview["date"] = pd.to_datetime(preview["date"]).dt.strftime("%Y-%m-%d")
+    preview_records = preview.to_dict(orient="records")
+
+    blocking_issues = list(quality_report["errors"])
+    if quality_report["duplicate_rows"]:
+        blocking_issues.append(
+            "Duplicate store-item calendar dates must be resolved before importing this file."
+        )
+
+    return {
+        "status": "success",
+        "can_import": not blocking_issues and quality_report["rows_valid"] > 0,
+        "preview_limit": 20,
+        "preview_rows": preview_records,
+        "quality_report": quality_report,
+        "blocking_issues": blocking_issues,
+        "excluded_rows": quality_report["rows_received"] - quality_report["rows_valid"],
+    }
+
+
 @app.post("/api/v1/inventory/template", tags=["Inventory"])
 async def create_inventory_template(
     sales_file: UploadFile = File(..., description="Validated historical sales CSV"),
