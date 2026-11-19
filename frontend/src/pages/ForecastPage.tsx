@@ -45,7 +45,7 @@ export default function ForecastPage() {
   return (
     <main className="forecast-page">
       <div className="forecast-container">
-        <div className="forecast-page-links"><Link to="/" className="forecast-back"><ArrowLeft size={16} /> Back to DemandIQ</Link><Link to="/workspace/inventory" className="forecast-back">Open inventory planning →</Link></div>
+        <div className="forecast-page-links"><Link to="/workspace" className="forecast-back"><ArrowLeft size={16} /> Back to DemandIQ</Link><Link to="/workspace/inventory" className="forecast-back">Open inventory planning →</Link></div>
         <div className="forecast-heading">
           <span className="forecast-eyebrow"><BarChart3 size={15} /> DEMAND PLANNING</span>
           <h1>Generate a demand forecast</h1>
