@@ -77,7 +77,7 @@ export default function DashboardPage() {
           </section>
 
           <section className="workspace-next-section">
-            <div className="workspace-section-heading"><div><h2>Your workspace, at a glance</h2><p>These capabilities are planned next; they are not active yet.</p></div></div>
+            <div className="workspace-section-heading"><div><h2>Your workspace, at a glance</h2><p>Manage your sales data and products, then explore the tools already available in your workspace.</p></div></div>
             <div className="workspace-coming-grid">
               <Link to="/workspace/sales" className="workspace-coming-card"><FileUp size={19}/><div><b>Sales imports</b><span>Validate sales files, build your product identifiers and review import history</span></div><span className="workspace-coming-tag">Available now</span></Link>
               <article className="workspace-coming-card"><Store size={19}/><div><b>Store management</b><span>Manage store and location information</span></div><span className="workspace-coming-tag">Coming next</span></article>
