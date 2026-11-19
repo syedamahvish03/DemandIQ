@@ -4,6 +4,7 @@ import ForecastPage from "./pages/ForecastPage";
 import InventoryPage from "./pages/InventoryPage";
 import AnalysesPage from "./pages/AnalysesPage";
 import DashboardPage from "./pages/DashboardPage";
+import SalesPage from "./pages/SalesPage";
 import AuthPage from "./components/AuthPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { Link, Route, Routes } from "react-router-dom";
@@ -159,6 +160,7 @@ export default function App() {
     <Route path="/login" element={<AuthPage mode="login"/>}/>
     <Route path="/signup" element={<AuthPage mode="signup"/>}/>
     <Route path="/workspace" element={<ProtectedRoute><DashboardPage/></ProtectedRoute>}/>
+    <Route path="/workspace/sales" element={<ProtectedRoute><SalesPage/></ProtectedRoute>}/>
     <Route path="/workspace/forecasts" element={<ProtectedRoute><ForecastPage/></ProtectedRoute>}/>
     <Route path="/workspace/inventory" element={<ProtectedRoute><InventoryPage/></ProtectedRoute>}/>
     <Route path="/workspace/analyses" element={<ProtectedRoute><AnalysesPage/></ProtectedRoute>}/>
