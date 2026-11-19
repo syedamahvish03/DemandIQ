@@ -329,3 +329,17 @@ def test_feature_builder_rejects_irregular_daily_series():
 
     with pytest.raises(ValueError, match="missing or irregular dates"):
         build_time_features(source)
+
+
+def test_feature_builder_accepts_mixed_date_representations():
+    source = sample_daily_sales(days=50)
+    source["date"] = [
+        date.strftime("%Y-%m-%d") if index % 2 == 0
+        else date.strftime("%Y-%m-%d %H:%M:%S")
+        for index, date in enumerate(source["date"])
+    ]
+
+    features = build_time_features(source)
+
+    assert len(features) == (50 - 14) * 4
+    assert features["date"].dt.normalize().nunique() == 36
