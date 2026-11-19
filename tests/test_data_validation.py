@@ -67,3 +67,21 @@ def test_non_finite_sales_values_are_excluded_and_reported():
     assert report["rows_valid"] == 2
     assert any("non-finite sales" in warning for warning in report["warnings"])
 
+
+
+def test_blank_identifiers_are_excluded_and_text_identifiers_are_trimmed():
+    source = pd.DataFrame({
+        "date": ["2025-01-01", "2025-01-02", "2025-01-03"],
+        "store": [" STORE_A ", "   ", "STORE_B"],
+        "item": [" ITEM_1 ", "ITEM_1", ""],
+        "sales": [10, 12, 14],
+    })
+
+    cleaned, report = validate_sales_data(source)
+
+    assert len(cleaned) == 1
+    assert cleaned.loc[0, "store"] == "STORE_A"
+    assert cleaned.loc[0, "item"] == "ITEM_1"
+    assert report["missing_identifiers"] == 2
+    assert report["rows_valid"] == 1
+    assert any("missing store or item identifier" in warning for warning in report["warnings"])
