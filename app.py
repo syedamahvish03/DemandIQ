@@ -10,6 +10,7 @@ from forecasting import (
     chronological_baseline_backtest,
     evaluate_random_forest,
     forecast_future_demand,
+    classify_demand_patterns,
     recursive_multi_horizon_backtest,
     rolling_origin_multi_horizon_backtest,
 )
@@ -253,6 +254,46 @@ with forecast_tab:
             "promotions, holidays, price changes, stockouts or future events unless those signals "
             "are added to the data and model."
         )
+
+    st.divider()
+    st.subheader("Demand pattern diagnostics")
+    st.write(
+        "Demand patterns are classified per store-item using average demand interval "
+        "(ADI) and squared coefficient of variation (CV²). These diagnostics help "
+        "identify intermittent and irregular demand; they do not change forecast outputs."
+    )
+
+    @st.cache_data(show_spinner="Classifying demand patterns by store and product...")
+    def run_demand_pattern_diagnostics(data: pd.DataFrame):
+        return classify_demand_patterns(data)
+
+    try:
+        demand_patterns = run_demand_pattern_diagnostics(df)
+        pattern_counts = (
+            demand_patterns["demand_pattern"].value_counts().rename_axis("demand_pattern")
+            .reset_index(name="store_item_series")
+        )
+        st.dataframe(pattern_counts, width="stretch", hide_index=True)
+        with st.expander("View store-item demand diagnostics", expanded=False):
+            st.dataframe(
+                demand_patterns.style.format({"ADI": "{:.2f}", "CV_squared": "{:.2f}"}),
+                width="stretch",
+                hide_index=True,
+            )
+        st.download_button(
+            "Download demand pattern diagnostics (CSV)",
+            data=demand_patterns.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_demand_pattern_diagnostics.csv",
+            mime="text/csv",
+            key="download_demand_pattern_diagnostics",
+        )
+        st.caption(
+            "Classification thresholds: ADI 1.32 and CV² 0.49. No-demand and "
+            "insufficient-observation series are separated instead of being forced "
+            "into a demand class. These are descriptive diagnostics, not a Croston forecast."
+        )
+    except ValueError as exc:
+        st.warning(f"Demand pattern diagnostics are not available: {exc}")
 
     st.divider()
     st.subheader("Forecast evaluation — Simple baselines")
