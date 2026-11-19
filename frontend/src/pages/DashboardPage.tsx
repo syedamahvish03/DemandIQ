@@ -82,7 +82,7 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <div className="workspace-data-note"><ShieldCheck size={17}/><span><b>Your files stay in this session for now.</b> Forecasts and inventory results are not yet saved to a cloud workspace or synced across devices. Persistent storage is a separate upcoming milestone.</span></div>
+          <div className="workspace-data-note"><ShieldCheck size={17}/><span><b>Your files and results are not saved yet.</b> Forecasts and inventory calculations are not stored in a cloud workspace or synced across devices. Persistent storage is a separate upcoming milestone.</span></div>
         </div>
       </section>
     </main>
