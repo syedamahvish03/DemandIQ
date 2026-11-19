@@ -679,6 +679,56 @@ def per_series_forecast_metrics(predictions: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values(["horizon_days", "model", "store", "item"]).reset_index(drop=True)
 
 
+def forecast_error_by_step(predictions: pd.DataFrame) -> pd.DataFrame:
+    """Measure recursive forecast accuracy separately at each forecast lead day."""
+    required = {"store", "item", "model", "actual", "prediction", "forecast_step"}
+    missing = sorted(required - set(predictions.columns))
+    if missing:
+        raise ValueError("Missing required prediction columns: " + ", ".join(missing))
+    if predictions.empty:
+        raise ValueError("No prediction rows are available for forecast-step analysis.")
+
+    frame = predictions.loc[:, list(required)].copy()
+    for column in ("actual", "prediction", "forecast_step"):
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    if frame[list(required)].isna().any().any():
+        raise ValueError("Forecast-step analysis requires valid identifiers and numeric predictions.")
+    values = frame[["actual", "prediction", "forecast_step"]].to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("Forecast-step analysis values must be finite.")
+    if frame["actual"].lt(0).any() or frame["prediction"].lt(0).any():
+        raise ValueError("Actual and predicted demand must be non-negative.")
+    if frame["forecast_step"].lt(1).any() or not frame["forecast_step"].mod(1).eq(0).all():
+        raise ValueError("Forecast steps must be positive whole numbers.")
+    if frame.duplicated(["store", "item", "model", "forecast_step"]).any():
+        raise ValueError("Forecast-step analysis requires one row per store-item-model-forecast-step.")
+
+    rows = []
+    for (model_name, step), group in frame.groupby(["model", "forecast_step"], sort=True):
+        errors = group["prediction"] - group["actual"]
+        actual_units = float(group["actual"].sum())
+        rows.append({
+            "model": model_name,
+            "forecast_step": int(step),
+            "evaluation_rows": int(len(group)),
+            "MAE": float(errors.abs().mean()),
+            "RMSE": float(np.sqrt(np.mean(np.square(errors)))),
+            "WAPE (%)": (
+                float(errors.abs().sum() / actual_units * 100)
+                if actual_units > 0 else float("nan")
+            ),
+            "Bias (%)": (
+                float(errors.sum() / actual_units * 100)
+                if actual_units > 0 else float("nan")
+            ),
+            "actual_units": actual_units,
+        })
+
+    return pd.DataFrame(rows).sort_values(
+        ["model", "forecast_step"]
+    ).reset_index(drop=True)
+
+
 def per_series_rolling_origin_metrics(predictions: pd.DataFrame) -> pd.DataFrame:
     """Summarize recursive forecast accuracy and origin stability per store-item."""
     required = {
