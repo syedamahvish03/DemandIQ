@@ -203,3 +203,83 @@ def test_forecast_endpoint_rejects_invalid_text_encoding():
 
     assert response.status_code == 400
     assert "valid CSV" in response.json()["detail"]
+
+
+
+def test_sales_validation_endpoint_returns_preview_and_import_readiness():
+    response = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("sales.csv", BytesIO(make_sales_csv()), "text/csv")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["can_import"] is True
+    assert payload["quality_report"]["rows_received"] == 50
+    assert payload["quality_report"]["rows_valid"] == 50
+    assert len(payload["preview_rows"]) == 20
+    assert payload["preview_rows"][0]["date"] == "2025-01-01"
+    assert payload["blocking_issues"] == []
+    assert payload["excluded_rows"] == 0
+
+
+def test_sales_validation_endpoint_blocks_duplicate_daily_keys():
+    duplicate_csv = (
+        b"date,store,item,sales\\n"
+        b"2025-01-01,STORE_A,SKU_1,10\\n"
+        b"2025-01-01 18:00:00,STORE_A,SKU_1,12\\n"
+    )
+    response = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("sales.csv", BytesIO(duplicate_csv), "text/csv")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["can_import"] is False
+    assert payload["quality_report"]["duplicate_rows"] == 1
+    assert any("Duplicate store-item calendar dates" in issue for issue in payload["blocking_issues"])
+
+
+def test_sales_validation_endpoint_reports_excluded_rows():
+    mixed_csv = (
+        b"date,store,item,sales\\n"
+        b"2025-01-01,STORE_A,SKU_1,10\\n"
+        b"not-a-date,STORE_A,SKU_1,12\\n"
+    )
+    response = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("sales.csv", BytesIO(mixed_csv), "text/csv")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["can_import"] is True
+    assert payload["quality_report"]["rows_valid"] == 1
+    assert payload["excluded_rows"] == 1
+    assert len(payload["preview_rows"]) == 1
+
+
+def test_sales_validation_endpoint_rejects_non_csv_and_oversized_uploads():
+    wrong_type = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("sales.txt", b"not a csv", "text/plain")},
+    )
+    assert wrong_type.status_code == 415
+
+    oversized = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("sales.csv", BytesIO(b"x" * (MAX_UPLOAD_BYTES + 1)), "text/csv")},
+    )
+    assert oversized.status_code == 413
+
+
+def test_sales_validation_endpoint_rejects_invalid_csv_encoding():
+    response = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("sales.csv", BytesIO(b"date,store,item,sales\\n\\xff"), "text/csv")},
+    )
+
+    assert response.status_code == 400
+    assert "valid CSV" in response.json()["detail"]
