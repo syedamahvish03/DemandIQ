@@ -488,3 +488,68 @@ def test_weekday_variation_diagnostic_flags_insufficient_history():
     assert result["weekday_analysis_status"] == "insufficient_weekday_history"
     assert result["minimum_observations_per_weekday"] < 4
     assert pd.isna(result["weekday_mean_dispersion_pct"])
+
+
+def test_per_series_metrics_report_each_store_item_model_and_horizon():
+    from forecasting import per_series_forecast_metrics
+
+    predictions = pd.DataFrame([
+        {
+            "store": store, "item": item, "model": model,
+            "actual": actual, "prediction": prediction, "forecast_step": step,
+        }
+        for store, item, model, actual, prediction in [
+            (1, 101, "model_a", 10.0, 12.0),
+            (1, 101, "model_b", 10.0, 10.0),
+            (2, 202, "model_a", 20.0, 18.0),
+        ]
+        for step in range(1, 31)
+    ])
+    result = per_series_forecast_metrics(predictions)
+    row = result.loc[
+        (result["store"] == 1) & (result["item"] == 101)
+        & (result["model"] == "model_a") & (result["horizon_days"] == 7)
+    ].iloc[0]
+    assert len(result) == 9
+    assert row["evaluation_rows"] == 7
+    assert row["MAE"] == pytest.approx(2.0)
+    assert row["WAPE (%)"] == pytest.approx(20.0)
+    assert row["Bias (%)"] == pytest.approx(20.0)
+    assert set(result["horizon_days"]) == {7, 15, 30}
+
+
+def test_per_series_metrics_marks_zero_actual_wape_and_bias_undefined():
+    from forecasting import per_series_forecast_metrics
+
+    predictions = pd.DataFrame({
+        "store": [1] * 30, "item": [101] * 30, "model": ["test"] * 30,
+        "actual": [0.0] * 30, "prediction": [2.0] * 30,
+        "forecast_step": list(range(1, 31)),
+    })
+    result = per_series_forecast_metrics(predictions)
+    assert result["MAE"].eq(2.0).all()
+    assert result["WAPE (%)"].isna().all()
+    assert result["Bias (%)"].isna().all()
+
+
+@pytest.mark.parametrize(
+    "mutation, message",
+    [("duplicate", "one row per store-item-model-forecast-step"),
+     ("negative", "non-negative"), ("infinite", "finite")],
+)
+def test_per_series_metrics_rejects_invalid_prediction_rows(mutation, message):
+    from forecasting import per_series_forecast_metrics
+
+    predictions = pd.DataFrame({
+        "store": [1, 1], "item": [101, 101], "model": ["test", "test"],
+        "actual": [10.0, 10.0], "prediction": [11.0, 11.0],
+        "forecast_step": [1, 2],
+    })
+    if mutation == "duplicate":
+        predictions.loc[1, "forecast_step"] = 1
+    elif mutation == "negative":
+        predictions.loc[0, "actual"] = -1
+    else:
+        predictions.loc[0, "prediction"] = float("inf")
+    with pytest.raises(ValueError, match=message):
+        per_series_forecast_metrics(predictions)
