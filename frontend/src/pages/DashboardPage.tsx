@@ -6,6 +6,7 @@ const workspaceLinks = [
   { to: "/workspace", label: "Overview", icon: BarChart3, end: true },
   { to: "/workspace/forecasts", label: "Demand forecasts", icon: LineChart },
   { to: "/workspace/inventory", label: "Inventory planning", icon: Boxes },
+  { to: "/workspace/analyses", label: "Saved analyses", icon: Clock3 },
 ];
 
 export default function DashboardPage() {
@@ -78,11 +79,11 @@ export default function DashboardPage() {
             <div className="workspace-coming-grid">
               <article className="workspace-coming-card"><PackageSearch size={19}/><div><b>Product catalogue</b><span>Organise products and product attributes</span></div><span className="workspace-coming-tag">Coming next</span></article>
               <article className="workspace-coming-card"><Store size={19}/><div><b>Store management</b><span>Manage store and location information</span></div><span className="workspace-coming-tag">Coming next</span></article>
-              <article className="workspace-coming-card"><FileUp size={19}/><div><b>Saved reports</b><span>Keep a history of generated analysis</span></div><span className="workspace-coming-tag">Coming next</span></article>
+              <Link to="/workspace/analyses" className="workspace-coming-card"><FileUp size={19}/><div><b>Saved analyses</b><span>Review, export or delete previous forecasts and inventory plans</span></div><span className="workspace-coming-tag">Available now</span></Link>
             </div>
           </section>
 
-          <div className="workspace-data-note"><ShieldCheck size={17}/><span><b>Your files and results are not saved yet.</b> Forecasts and inventory calculations are not stored in a cloud workspace or synced across devices. Persistent storage is a separate upcoming milestone.</span></div>
+          <div className="workspace-data-note"><ShieldCheck size={17}/><span><b>Your analysis results are saved to your private workspace.</b> Forecast outputs and inventory recommendations are stored in Supabase and available when you sign in again. Original uploaded CSV files are not stored.</span></div>
         </div>
       </section>
     </main>
