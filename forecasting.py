@@ -49,7 +49,7 @@ def build_time_features(data: pd.DataFrame) -> pd.DataFrame:
     frame = frame.sort_values(["store", "item", "date"]).reset_index(drop=True)
     for (store, item), group in frame.groupby(["store", "item"], sort=False):
         dates = pd.DatetimeIndex(group["date"])
-        if dates.diff().dropna().ne(pd.Timedelta(days=1)).any():
+        if (dates[1:] - dates[:-1] != pd.Timedelta(days=1)).any():
             raise ValueError(
                 f"Store {store}, item {item} has missing or irregular dates. "
                 "Provide a complete daily series before feature engineering."
