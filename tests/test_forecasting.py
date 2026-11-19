@@ -289,6 +289,7 @@ def test_rolling_origin_backtest_rejects_invalid_training_cap():
 
 def test_feature_builder_rejects_non_finite_sales():
     source = sample_daily_sales()
+    source["sales"] = source["sales"].astype(float)
     source.loc[source.index[0], "sales"] = float("inf")
 
     with pytest.raises(ValueError, match="finite numbers"):
@@ -297,6 +298,7 @@ def test_feature_builder_rejects_non_finite_sales():
 
 def test_feature_builder_rejects_negative_sales():
     source = sample_daily_sales()
+    source["sales"] = source["sales"].astype(float)
     source.loc[source.index[0], "sales"] = -1
 
     with pytest.raises(ValueError, match="non-negative"):
@@ -305,6 +307,7 @@ def test_feature_builder_rejects_negative_sales():
 
 def test_feature_builder_rejects_blank_identifiers():
     source = sample_daily_sales()
+    source["store"] = source["store"].astype(str)
     source.loc[source.index[0], "store"] = "   "
 
     with pytest.raises(ValueError, match="nonblank store/item identifiers"):
