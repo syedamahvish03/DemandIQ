@@ -1150,3 +1150,76 @@ def rolling_origin_multi_horizon_backtest(
         "evaluation_method": "rolling_origin_recursive_multi_step",
     }
     return metrics, all_predictions, metadata
+
+
+def empirical_error_bands_by_step(
+    predictions: pd.DataFrame,
+    lower_quantile: float = 0.05,
+    upper_quantile: float = 0.95,
+    min_samples: int = 20,
+) -> pd.DataFrame:
+    """Estimate historical signed-error bands by model and recursive lead day.
+
+    Bands are empirical residual quantiles from rolling-origin backtests. They
+    are descriptive calibration diagnostics, not guaranteed prediction intervals.
+    """
+    required = {
+        "origin", "store", "item", "model", "actual", "prediction", "forecast_step"
+    }
+    missing = sorted(required - set(predictions.columns))
+    if missing:
+        raise ValueError("Missing required rolling prediction columns: " + ", ".join(missing))
+    if predictions.empty:
+        raise ValueError("No rolling-origin prediction rows are available.")
+    if (
+        not np.isfinite([lower_quantile, upper_quantile]).all()
+        or not 0 <= lower_quantile < upper_quantile <= 1
+    ):
+        raise ValueError("Error-band quantiles must satisfy 0 <= lower < upper <= 1.")
+    if isinstance(min_samples, bool) or not isinstance(min_samples, (int, np.integer)) or min_samples < 1:
+        raise ValueError("min_samples must be a positive whole number.")
+
+    frame = predictions.loc[:, list(required)].copy()
+    for column in ("actual", "prediction", "forecast_step"):
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    if frame[list(required)].isna().any().any():
+        raise ValueError("Error-band analysis requires valid origins, identifiers and numeric predictions.")
+    values = frame[["actual", "prediction", "forecast_step"]].to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise ValueError("Error-band analysis values must be finite.")
+    if frame["actual"].lt(0).any() or frame["prediction"].lt(0).any():
+        raise ValueError("Actual and predicted demand must be non-negative.")
+    if frame["forecast_step"].lt(1).any() or not frame["forecast_step"].mod(1).eq(0).all():
+        raise ValueError("Forecast steps must be positive whole numbers.")
+    if frame[["store", "item", "model", "origin"]].astype(str).apply(
+        lambda column: column.str.strip().eq("")
+    ).any(axis=1).any():
+        raise ValueError("Origins, store, item and model identifiers must be nonblank.")
+    key = ["origin", "store", "item", "model", "forecast_step"]
+    if frame.duplicated(key).any():
+        raise ValueError("Error-band analysis requires one row per origin-store-item-model-forecast-step.")
+
+    frame["signed_error"] = frame["actual"] - frame["prediction"]
+    rows = []
+    for (model_name, step), group in frame.groupby(["model", "forecast_step"], sort=True):
+        sample_count = int(len(group))
+        enough_history = sample_count >= min_samples
+        rows.append({
+            "model": model_name,
+            "forecast_step": int(step),
+            "sample_count": sample_count,
+            "lower_error_bound": (
+                float(group["signed_error"].quantile(lower_quantile))
+                if enough_history else float("nan")
+            ),
+            "upper_error_bound": (
+                float(group["signed_error"].quantile(upper_quantile))
+                if enough_history else float("nan")
+            ),
+            "calibration_status": (
+                "sufficient_history" if enough_history else "insufficient_history"
+            ),
+        })
+    return pd.DataFrame(rows).sort_values(
+        ["model", "forecast_step"]
+    ).reset_index(drop=True)
