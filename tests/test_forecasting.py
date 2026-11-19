@@ -341,5 +341,5 @@ def test_feature_builder_accepts_mixed_date_representations():
 
     features = build_time_features(source)
 
-    assert len(features) == (50 - 14) * 4
-    assert features["date"].dt.normalize().nunique() == 36
+    assert len(features) == 50 * 4
+    assert features["date"].dt.normalize().nunique() == 50
