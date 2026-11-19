@@ -404,7 +404,7 @@ def test_weekly_seasonal_naive_repeats_weekday_demand_in_recursive_backtest():
         "date": dates,
         "store": ["WEEKLY_STORE"] * len(dates),
         "item": ["WEEKLY_ITEM"] * len(dates),
-        "sales": [weekday_demand[date.dayofweek] for date in dates],
+        "sales": [weekday_demand[date.day_of_week] for date in dates],
     })
 
     metrics, predictions, _ = recursive_multi_horizon_backtest(source)
