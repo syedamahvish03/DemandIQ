@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { checkApiHealth } from "./lib/api";
 import ForecastPage from "./pages/ForecastPage";
 import InventoryPage from "./pages/InventoryPage";
+import AnalysesPage from "./pages/AnalysesPage";
 import DashboardPage from "./pages/DashboardPage";
 import AuthPage from "./components/AuthPage";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -160,6 +161,7 @@ export default function App() {
     <Route path="/workspace" element={<ProtectedRoute><DashboardPage/></ProtectedRoute>}/>
     <Route path="/workspace/forecasts" element={<ProtectedRoute><ForecastPage/></ProtectedRoute>}/>
     <Route path="/workspace/inventory" element={<ProtectedRoute><InventoryPage/></ProtectedRoute>}/>
+    <Route path="/workspace/analyses" element={<ProtectedRoute><AnalysesPage/></ProtectedRoute>}/>
     <Route path="*" element={<HomePage/>}/>
   </Routes>;
 }
