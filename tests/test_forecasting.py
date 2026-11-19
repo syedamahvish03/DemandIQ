@@ -693,3 +693,68 @@ def test_per_series_model_recommendations_rejects_invalid_metrics(mutation, mess
 
     with pytest.raises(ValueError, match=message):
         recommend_per_series_models(metrics)
+
+
+
+def test_forecast_error_by_step_reports_recursive_error_growth():
+    from forecasting import forecast_error_by_step
+
+    predictions = pd.DataFrame([
+        {
+            "store": store, "item": item, "model": "random_forest",
+            "actual": 10.0, "prediction": 10.0 + step,
+            "forecast_step": step,
+        }
+        for step in range(1, 4)
+        for store, item in [(1, 101), (2, 102)]
+    ])
+
+    result = forecast_error_by_step(predictions)
+
+    assert result["forecast_step"].tolist() == [1, 2, 3]
+    assert result["evaluation_rows"].tolist() == [2, 2, 2]
+    assert result["MAE"].tolist() == pytest.approx([1.0, 2.0, 3.0])
+    assert result["WAPE (%)"].tolist() == pytest.approx([10.0, 20.0, 30.0])
+    assert result["Bias (%)"].tolist() == pytest.approx([10.0, 20.0, 30.0])
+
+
+def test_forecast_error_by_step_marks_zero_demand_percentage_metrics_undefined():
+    from forecasting import forecast_error_by_step
+
+    predictions = pd.DataFrame({
+        "store": [1, 1], "item": [101, 101], "model": ["rf", "rf"],
+        "actual": [0.0, 0.0], "prediction": [2.0, 4.0],
+        "forecast_step": [1, 2],
+    })
+
+    result = forecast_error_by_step(predictions)
+
+    assert result["MAE"].tolist() == [2.0, 4.0]
+    assert result["WAPE (%)"].isna().all()
+    assert result["Bias (%)"].isna().all()
+
+
+@pytest.mark.parametrize(
+    "mutation, message",
+    [
+        ("duplicate", "one row per store-item-model-forecast-step"),
+        ("negative", "non-negative"),
+        ("invalid_step", "positive whole numbers"),
+    ],
+)
+def test_forecast_error_by_step_rejects_invalid_prediction_rows(mutation, message):
+    from forecasting import forecast_error_by_step
+
+    predictions = pd.DataFrame({
+        "store": [1], "item": [101], "model": ["rf"],
+        "actual": [10.0], "prediction": [11.0], "forecast_step": [1],
+    })
+    if mutation == "duplicate":
+        predictions = pd.concat([predictions, predictions], ignore_index=True)
+    elif mutation == "negative":
+        predictions.loc[0, "actual"] = -1
+    else:
+        predictions.loc[0, "forecast_step"] = 0
+
+    with pytest.raises(ValueError, match=message):
+        forecast_error_by_step(predictions)
