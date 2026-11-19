@@ -49,3 +49,21 @@ def test_duplicate_rows_are_flagged_but_retained():
     cleaned, report = validate_sales_data(source)
     assert len(cleaned) == 2
     assert report["duplicate_rows"] == 1
+
+
+def test_non_finite_sales_values_are_excluded_and_reported():
+    source = pd.DataFrame({
+        "date": ["2025-01-01", "2025-01-02", "2025-01-03", "2025-01-04"],
+        "store": [1, 1, 1, 1],
+        "item": [101, 101, 101, 101],
+        "sales": [10, float("inf"), float("-inf"), 12],
+    })
+
+    cleaned, report = validate_sales_data(source)
+
+    assert cleaned["sales"].tolist() == [10.0, 12.0]
+    assert report["invalid_sales"] == 2
+    assert report["negative_sales"] == 0
+    assert report["rows_valid"] == 2
+    assert any("non-finite sales" in warning for warning in report["warnings"])
+
