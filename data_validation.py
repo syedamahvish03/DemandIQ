@@ -37,7 +37,7 @@ def validate_sales_data(data: pd.DataFrame):
             lambda value: value.strip() if isinstance(value, str) else value
         )
 
-    parsed_dates = pd.to_datetime(df["date"], errors="coerce")
+    parsed_dates = pd.to_datetime(df["date"], format="mixed", errors="coerce")
     numeric_sales = pd.to_numeric(df["sales"], errors="coerce")
     invalid_dates = parsed_dates.isna()
     finite_sales = pd.Series(
