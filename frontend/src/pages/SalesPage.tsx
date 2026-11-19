@@ -90,8 +90,6 @@ export default function SalesPage() {
     }
   }
 
-  const firstName = session?.user.user_metadata?.full_name?.split(/\\s+/)[0] || session?.user.email?.split("@")[0] || "there";
-
   return (
     <main className="workspace-shell">
       <aside className="workspace-sidebar">
