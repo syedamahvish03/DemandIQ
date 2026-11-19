@@ -4,7 +4,7 @@ from io import BytesIO
 import pandas as pd
 from fastapi.testclient import TestClient
 
-from backend.app.main import app
+from backend.app.main import MAX_UPLOAD_BYTES, app
 
 client = TestClient(app)
 
@@ -148,3 +148,16 @@ def test_inventory_recommendations_reject_unsupported_forecast_horizon():
 
     assert response.status_code == 422
     assert "7, 15 or 30" in response.json()["detail"]
+
+
+
+def test_forecast_endpoint_rejects_upload_over_size_limit():
+    oversized_csv = b"x" * (MAX_UPLOAD_BYTES + 1)
+    response = client.post(
+        "/api/v1/forecasts",
+        files={"file": ("sales.csv", BytesIO(oversized_csv), "text/csv")},
+        data={"horizon_days": "7"},
+    )
+
+    assert response.status_code == 413
+    assert "10 MB upload limit" in response.json()["detail"]
