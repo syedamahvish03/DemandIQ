@@ -162,6 +162,27 @@ export default function InventoryPage() {
             <div><small>FORECAST HORIZON</small><strong>{result.metadata.forecast_horizon_days} days</strong></div>
             <div><small>DEMAND BASIS</small><strong>ML forecast</strong></div>
           </div>
+          <section className="inventory-insights" aria-label="Inventory decision insights">
+            <div className="inventory-insights-heading"><div><span className="forecast-eyebrow">DECISION SUPPORT</span><h3>What needs your attention?</h3><p>Alerts are generated from the stock and forecast values in this plan.</p></div>
+              <span className={result.recommendations.some(row => row.reorder_required) ? "inventory-alert-count has-alerts" : "inventory-alert-count"}>{result.recommendations.filter(row => row.reorder_required).length} reorder alerts</span>
+            </div>
+            <div className="inventory-alert-list">
+              {result.recommendations.filter(row => row.reorder_required).slice(0, 6).map(row => (
+                <article className="inventory-alert-item" key={`${row.store}-${row.item}`}>
+                  <span className="inventory-alert-symbol"><Boxes size={16}/></span>
+                  <div><b>Replenishment recommended · {row.item}</b><p>Store {row.store} has an inventory position of {row.inventory_position.toFixed(1)}, at or below its reorder point of {row.reorder_point.toFixed(1)}.</p></div>
+                  <strong>Order {row.recommended_order_qty}</strong>
+                </article>
+              ))}
+              {!result.recommendations.some(row => row.reorder_required) && <div className="inventory-all-clear">No reorder alerts were triggered by the current inputs. Continue monitoring stock and refresh the plan when sales or inventory changes.</div>}
+            </div>
+            <div className="inventory-explanation-grid">
+              <div><b>Reorder point</b><span>Forecast demand during supplier lead time + safety stock.</span></div>
+              <div><b>Target stock</b><span>Forecast demand across lead time and review period + safety stock.</span></div>
+              <div><b>Inventory position</b><span>On-hand stock + incoming orders − backorders.</span></div>
+              <div><b>Suggested order</b><span>Ceiling of the positive gap between target stock and inventory position.</span></div>
+            </div>
+          </section>
           {result.recommendations.length === 0 ? <p className="inventory-empty">No complete recommendations yet. Check that the inventory CSV contains stock and lead-time values for products with matching sales history.</p> :
             <div className="forecast-table-wrap">
               <div className="forecast-table-title">
