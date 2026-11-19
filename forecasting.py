@@ -22,10 +22,39 @@ def build_time_features(data: pd.DataFrame) -> pd.DataFrame:
         ])
 
     frame = data.loc[:, list(REQUIRED_COLUMNS)].copy()
+    for column in ("store", "item"):
+        frame[column] = frame[column].map(
+            lambda value: value.strip() if isinstance(value, str) else value
+        )
     frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
     frame["sales"] = pd.to_numeric(frame["sales"], errors="coerce")
-    frame = frame.dropna(subset=["date", "store", "item", "sales"])
+
+    if frame[["date", "store", "item", "sales"]].isna().any().any():
+        raise ValueError(
+            "Forecasting requires valid dates, nonblank store/item identifiers "
+            "and numeric sales. Clean invalid rows before feature engineering."
+        )
+    if not np.isfinite(frame["sales"].to_numpy(dtype=float)).all():
+        raise ValueError("Sales values must be finite numbers.")
+    if frame["sales"].lt(0).any():
+        raise ValueError("Sales values must be non-negative.")
+
+    frame["date"] = frame["date"].dt.normalize()
+    if frame.duplicated(["store", "item", "date"]).any():
+        raise ValueError(
+            "Forecasting requires one sales row per date, store and item. "
+            "Aggregate duplicate daily records before feature engineering."
+        )
+
     frame = frame.sort_values(["store", "item", "date"]).reset_index(drop=True)
+    for (store, item), group in frame.groupby(["store", "item"], sort=False):
+        dates = pd.DatetimeIndex(group["date"])
+        if dates.diff().dropna().ne(pd.Timedelta(days=1)).any():
+            raise ValueError(
+                f"Store {store}, item {item} has missing or irregular dates. "
+                "Provide a complete daily series before feature engineering."
+            )
+
     grouped = frame.groupby(["store", "item"], sort=False)["sales"]
 
     frame["lag_1"] = grouped.shift(1)
