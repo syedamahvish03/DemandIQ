@@ -129,6 +129,60 @@ def classify_demand_patterns(data: pd.DataFrame) -> pd.DataFrame:
         ["demand_pattern", "store", "item"]
     ).reset_index(drop=True)
 
+
+def measure_weekday_demand_variation(data: pd.DataFrame) -> pd.DataFrame:
+    """Measure descriptive variation in mean sales across weekdays per series.
+
+    At least four observations for every weekday are required. The dispersion
+    metric is not a statistical seasonality test and can also reflect trends,
+    promotions, holidays or other calendar effects. It does not alter forecasts.
+    """
+    features = build_time_features(data)
+    if features.empty:
+        raise ValueError("No usable sales rows are available for weekday analysis.")
+
+    rows = []
+    for (store, item), group in features.groupby(["store", "item"], sort=False):
+        weekday = group.assign(weekday=group["date"].dt.dayofweek)
+        weekday_stats = weekday.groupby("weekday")["sales"].agg(["mean", "count"])
+        counts = weekday_stats["count"].reindex(range(7), fill_value=0)
+        means = weekday_stats["mean"].reindex(range(7))
+        sufficient_history = bool(counts.ge(4).all())
+        overall_mean = float(group["sales"].mean())
+        dispersion = float("nan")
+        strongest = None
+        weakest = None
+        if sufficient_history and overall_mean > 0:
+            weekday_means = means.astype(float)
+            dispersion = float(
+                weekday_means.std(ddof=0) / weekday_means.mean() * 100
+            )
+            strongest = pd.Timestamp("2025-01-06") + pd.Timedelta(
+                days=int(weekday_means.idxmax())
+            )
+            weakest = pd.Timestamp("2025-01-06") + pd.Timedelta(
+                days=int(weekday_means.idxmin())
+            )
+
+        rows.append({
+            "store": store,
+            "item": item,
+            "observations": int(len(group)),
+            "minimum_observations_per_weekday": int(counts.min()),
+            "weekday_mean_dispersion_pct": dispersion,
+            "highest_mean_sales_weekday": strongest.day_name() if strongest is not None else None,
+            "lowest_mean_sales_weekday": weakest.day_name() if weakest is not None else None,
+            "weekday_analysis_status": (
+                "no_demand" if overall_mean == 0
+                else "sufficient_history" if sufficient_history
+                else "insufficient_weekday_history"
+            ),
+        })
+
+    return pd.DataFrame(rows).sort_values(
+        ["weekday_analysis_status", "store", "item"]
+    ).reset_index(drop=True)
+
 def chronological_baseline_backtest(data: pd.DataFrame, holdout_days: int = 28):
     """Compare lag-7 seasonal naive and trailing-7-day mean on the final dates.
 
