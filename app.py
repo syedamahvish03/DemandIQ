@@ -9,6 +9,7 @@ from eda import daily_sales, store_sales, summarize_sales_data, top_products, we
 from forecasting import (
     chronological_baseline_backtest,
     evaluate_random_forest,
+    empirical_error_bands_by_step,
     forecast_error_by_step,
     forecast_accuracy_by_demand_pattern,
     forecast_future_demand,
@@ -679,6 +680,58 @@ with forecast_tab:
             rolling_metrics[
                 ["model", "horizon_days", "mean_origin_WAPE (%)", "WAPE_std_across_origins (%)"]
             ]
+        )
+
+        st.subheader("Historical forecast error bands by lead day")
+        st.write(
+            "Estimate the central 90% range of historical signed forecast errors at each "
+            "recursive lead day. These empirical bands help show uncertainty growth by horizon."
+        )
+        error_bands = empirical_error_bands_by_step(
+            rolling_predictions, lower_quantile=0.05, upper_quantile=0.95, min_samples=20
+        )
+        band_model_options = sorted(error_bands["model"].unique().tolist())
+        selected_band_model = st.selectbox(
+            "Model for historical error bands",
+            band_model_options,
+            key="historical_error_band_model",
+        )
+        selected_error_bands = error_bands.loc[
+            error_bands["model"] == selected_band_model
+        ].copy()
+        sufficient_bands = selected_error_bands.loc[
+            selected_error_bands["calibration_status"] == "sufficient_history"
+        ]
+        if not sufficient_bands.empty:
+            st.plotly_chart(
+                px.line(
+                    sufficient_bands,
+                    x="forecast_step",
+                    y=["lower_error_bound", "upper_error_bound"],
+                    markers=True,
+                    title="Empirical 5th–95th percentile signed error by lead day (units)",
+                ),
+                width="stretch",
+            )
+        st.dataframe(
+            selected_error_bands.style.format({
+                "lower_error_bound": "{:,.2f}",
+                "upper_error_bound": "{:,.2f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.download_button(
+            "Download historical forecast error bands (CSV)",
+            data=error_bands.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_historical_forecast_error_bands.csv",
+            mime="text/csv",
+            key="download_historical_error_bands",
+        )
+        st.caption(
+            "Bands are empirical residual quantiles from the evaluated rolling origins, "
+            "not guaranteed prediction intervals or formal confidence intervals. Steps with "
+            "fewer than 20 historical predictions are marked insufficient and not charted."
         )
         st.subheader("Forecast error stability across origins")
         st.dataframe(
