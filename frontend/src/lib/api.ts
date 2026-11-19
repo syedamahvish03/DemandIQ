@@ -164,3 +164,40 @@ export async function generateInventoryRecommendations(
   if (!response.ok) throw new Error(await readApiError(response));
   return (await response.json()) as InventoryResult;
 }
+
+
+export type SalesValidationResult = {
+  status: "success";
+  can_import: boolean;
+  preview_limit: number;
+  preview_rows: Array<{
+    date: string;
+    store: string | number;
+    item: string | number;
+    sales: number;
+  }>;
+  quality_report: {
+    rows_received: number;
+    rows_valid: number;
+    invalid_dates: number;
+    invalid_sales: number;
+    negative_sales: number;
+    missing_identifiers: number;
+    duplicate_rows: number;
+    errors: string[];
+    warnings: string[];
+  };
+  blocking_issues: string[];
+  excluded_rows: number;
+};
+
+export async function validateSalesCsv(file: File): Promise<SalesValidationResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/api/v1/sales/validate`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!response.ok) throw new Error(await readApiError(response));
+  return (await response.json()) as SalesValidationResult;
+}
