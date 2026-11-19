@@ -393,3 +393,36 @@ def test_demand_pattern_diagnostics_flags_single_nonzero_observation():
     result = classify_demand_patterns(source)
 
     assert result.loc[0, "demand_pattern"] == "insufficient_nonzero_observations"
+
+
+def test_weekly_seasonal_naive_repeats_weekday_demand_in_recursive_backtest():
+    from forecasting import recursive_multi_horizon_backtest
+
+    dates = pd.date_range("2025-01-01", periods=75, freq="D")
+    weekday_demand = [10, 10, 10, 10, 10, 30, 40]
+    source = pd.DataFrame({
+        "date": dates,
+        "store": ["WEEKLY_STORE"] * len(dates),
+        "item": ["WEEKLY_ITEM"] * len(dates),
+        "sales": [weekday_demand[date.dayofweek] for date in dates],
+    })
+
+    metrics, predictions, _ = recursive_multi_horizon_backtest(source)
+
+    seasonal_scores = metrics.loc[
+        metrics["model"] == "seasonal_naive_7"
+    ].sort_values("horizon_days")
+    moving_average_scores = metrics.loc[
+        metrics["model"] == "moving_average_7"
+    ].sort_values("horizon_days")
+
+    assert seasonal_scores["horizon_days"].tolist() == [7, 15, 30]
+    assert seasonal_scores["WAPE (%)"].eq(0).all()
+    assert moving_average_scores["WAPE (%)"].gt(0).all()
+
+    seasonal_predictions = predictions.loc[
+        predictions["model"] == "seasonal_naive_7"
+    ]
+    assert seasonal_predictions["prediction"].tolist() == (
+        seasonal_predictions["actual"].tolist()
+    )
