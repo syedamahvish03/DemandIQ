@@ -59,7 +59,14 @@ def validate_sales_data(data: pd.DataFrame):
     report["invalid_sales"] = int(invalid_sales.sum())
     report["negative_sales"] = int(negative_sales.sum())
     report["missing_identifiers"] = int(missing_identifiers.sum())
-    report["duplicate_rows"] = int(df.duplicated(subset=list(REQUIRED_COLUMNS)).sum())
+    daily_keys = pd.DataFrame({
+        "date": parsed_dates.dt.normalize(),
+        "store": df["store"],
+        "item": df["item"],
+    })
+    report["duplicate_rows"] = int(
+        daily_keys.duplicated(subset=["date", "store", "item"]).sum()
+    )
 
     valid_mask = ~(invalid_dates | invalid_sales | negative_sales | missing_identifiers)
     cleaned = df.loc[valid_mask].copy()
@@ -77,7 +84,7 @@ def validate_sales_data(data: pd.DataFrame):
         report["warnings"].append(f"{report['missing_identifiers']} row(s) have a missing store or item identifier and were excluded.")
     if report["duplicate_rows"]:
         report["warnings"].append(
-            f"{report['duplicate_rows']} duplicate row(s) detected. They are retained for review, not automatically removed."
+            f"{report['duplicate_rows']} duplicate daily store-item date record(s) detected. They are retained for review; forecasting requires one row per store-item per calendar day."
         )
     if cleaned.empty:
         report["errors"].append("No usable rows remain after validation.")
