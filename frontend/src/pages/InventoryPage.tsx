@@ -6,6 +6,7 @@ import { downloadInventoryTemplate, generateInventoryRecommendations } from "../
 import { downloadCsv } from "../lib/csv";
 import type { InventoryResult } from "../lib/api";
 import { saveInventoryAnalysis } from "../lib/analysisRuns";
+import { getWorkspaceSalesFile } from "../lib/workspaceSales";
 
 type ForecastHorizon = 7 | 15 | 30;
 
@@ -18,6 +19,21 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(false);
   const [templateLoading, setTemplateLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+
+  async function handleWorkspaceSalesLoad() {
+    setWorkspaceLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const source = await getWorkspaceSalesFile();
+      setSalesFile(source.file);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Workspace sales data could not be loaded.");
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  }
 
   async function handleTemplateDownload() {
     if (!salesFile) {
@@ -78,12 +94,15 @@ export default function InventoryPage() {
         <div className="forecast-heading">
           <span className="forecast-eyebrow"><Boxes size={15} /> INVENTORY PLANNING</span>
           <h1>Plan your replenishment</h1>
-          <p>Combine machine-learning demand forecasts with your actual stock and supplier lead-time inputs to calculate replenishment guidance.</p>
+          <p>Use sales already imported into your private workspace, then add actual stock and supplier lead-time inputs to calculate replenishment guidance.</p>
         </div>
 
         <section className="forecast-card">
           <form onSubmit={handleSubmit}>
-            <label className="forecast-field-label" htmlFor="inventory-sales-file">1. Historical sales CSV</label>
+            <label className="forecast-field-label" htmlFor="inventory-sales-file">1. Historical sales data</label>
+            <button type="button" className="button button-quiet button-small" onClick={handleWorkspaceSalesLoad} disabled={workspaceLoading || loading}>
+              {workspaceLoading ? <><LoaderCircle className="forecast-spinner" size={15}/> Loading workspace sales…</> : "Use imported workspace sales"}
+            </button>
             <label className="forecast-upload inventory-upload" htmlFor="inventory-sales-file">
               <UploadCloud size={24} />
               <strong>{salesFile ? salesFile.name : "Choose your sales CSV"}</strong>
