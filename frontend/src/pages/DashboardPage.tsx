@@ -1,0 +1,90 @@
+import { ArrowRight, BarChart3, Boxes, CircleHelp, Clock3, FileUp, LineChart, PackageSearch, ShieldCheck, Store, TrendingUp } from "lucide-react";
+import { Link, NavLink } from "react-router-dom";
+import { useAuth } from "../lib/AuthContext";
+
+const workspaceLinks = [
+  { to: "/workspace", label: "Overview", icon: BarChart3, end: true },
+  { to: "/workspace/forecasts", label: "Demand forecasts", icon: LineChart },
+  { to: "/workspace/inventory", label: "Inventory planning", icon: Boxes },
+];
+
+export default function DashboardPage() {
+  const { session } = useAuth();
+  const metadataName = session?.user.user_metadata?.full_name;
+  const firstName = typeof metadataName === "string" && metadataName.trim()
+    ? metadataName.trim().split(/\s+/)[0]
+    : session?.user.email?.split("@")[0] ?? "there";
+
+  return (
+    <main className="workspace-shell">
+      <aside className="workspace-sidebar">
+        <Link className="workspace-brand" to="/">
+          <span className="brand-mark"><TrendingUp size={19} /></span>
+          <span>Demand<span className="brand-iq">IQ</span></span>
+        </Link>
+        <span className="workspace-nav-label">WORKSPACE</span>
+        <nav className="workspace-nav" aria-label="Workspace navigation">
+          {workspaceLinks.map(({ to, label, icon: Icon, end }) => (
+            <NavLink key={to} to={to} end={end} className={({ isActive }) => isActive ? "workspace-nav-link active" : "workspace-nav-link"}>
+              <Icon size={17} />{label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="workspace-sidebar-bottom">
+          <div className="workspace-help-icon"><CircleHelp size={17}/></div>
+          <b>Building a clearer retail picture</b>
+          <p>Start with your sales history, then explore demand and stock planning.</p>
+        </div>
+      </aside>
+
+      <section className="workspace-main">
+        <header className="workspace-topbar">
+          <div><span className="workspace-topbar-label">DEMANDIQ WORKSPACE</span><span className="workspace-account-email">{session?.user.email}</span></div>
+          <span className="workspace-secure"><ShieldCheck size={15}/> Secure account</span>
+        </header>
+
+        <div className="workspace-content">
+          <div className="workspace-welcome">
+            <div>
+              <span className="forecast-eyebrow">WORKSPACE OVERVIEW</span>
+              <h1>Welcome, {firstName}.</h1>
+              <p>Your retail planning workspace is ready. Choose a workflow to get started.</p>
+            </div>
+            <div className="workspace-date"><Clock3 size={15}/>{new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(new Date())}</div>
+          </div>
+
+          <section className="workspace-start-section">
+            <div className="workspace-section-heading"><div><h2>Plan your next move</h2><p>Use your own sales and inventory files to generate business insights.</p></div></div>
+            <div className="workspace-action-grid">
+              <Link to="/workspace/forecasts" className="workspace-action-card">
+                <span className="workspace-action-icon blue"><LineChart size={21}/></span>
+                <span className="workspace-card-eyebrow">DEMAND PLANNING</span>
+                <strong>Generate a demand forecast</strong>
+                <span className="workspace-card-description">Upload historical daily sales and estimate demand for the next 7, 15 or 30 days.</span>
+                <span className="workspace-card-link">Open forecasts <ArrowRight size={15}/></span>
+              </Link>
+              <Link to="/workspace/inventory" className="workspace-action-card">
+                <span className="workspace-action-icon mint"><Boxes size={21}/></span>
+                <span className="workspace-card-eyebrow">INVENTORY PLANNING</span>
+                <strong>Plan replenishment</strong>
+                <span className="workspace-card-description">Combine sales history with actual stock and supplier inputs to calculate reorder guidance.</span>
+                <span className="workspace-card-link">Open inventory <ArrowRight size={15}/></span>
+              </Link>
+            </div>
+          </section>
+
+          <section className="workspace-next-section">
+            <div className="workspace-section-heading"><div><h2>Your workspace, at a glance</h2><p>These capabilities are planned next; they are not active yet.</p></div></div>
+            <div className="workspace-coming-grid">
+              <article className="workspace-coming-card"><PackageSearch size={19}/><div><b>Product catalogue</b><span>Organise products and product attributes</span></div><span className="workspace-coming-tag">Coming next</span></article>
+              <article className="workspace-coming-card"><Store size={19}/><div><b>Store management</b><span>Manage store and location information</span></div><span className="workspace-coming-tag">Coming next</span></article>
+              <article className="workspace-coming-card"><FileUp size={19}/><div><b>Saved reports</b><span>Keep a history of generated analysis</span></div><span className="workspace-coming-tag">Coming next</span></article>
+            </div>
+          </section>
+
+          <div className="workspace-data-note"><ShieldCheck size={17}/><span><b>Your files stay in this session for now.</b> Forecasts and inventory results are not yet saved to a cloud workspace or synced across devices. Persistent storage is a separate upcoming milestone.</span></div>
+        </div>
+      </section>
+    </main>
+  );
+}
