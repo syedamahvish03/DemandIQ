@@ -12,6 +12,7 @@ from forecasting import (
     forecast_future_demand,
     classify_demand_patterns,
     measure_weekday_demand_variation,
+    per_series_forecast_metrics,
     recursive_multi_horizon_backtest,
     rolling_origin_multi_horizon_backtest,
 )
@@ -503,6 +504,41 @@ with forecast_tab:
             "The 7-, 15- and 30-day scores are cumulative from the same holdout origin. "
             "This is one final holdout, not a multi-origin rolling backtest; results describe "
             "this dataset and evaluation window only."
+        )
+
+        st.subheader("Forecast accuracy by store and product")
+        st.write(
+            "Aggregate scores can hide weak individual products. This breakdown reports "
+            "recursive errors separately for every store-item series, model and horizon."
+        )
+        per_series_metrics = per_series_forecast_metrics(multi_predictions)
+        series_models = sorted(per_series_metrics["model"].unique().tolist())
+        selected_series_model = st.selectbox(
+            "Model for store-product accuracy", series_models,
+            key="per_series_accuracy_model",
+        )
+        selected_series_metrics = per_series_metrics.loc[
+            per_series_metrics["model"] == selected_series_model
+        ]
+        st.dataframe(
+            selected_series_metrics.style.format({
+                "MAE": "{:,.2f}", "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}", "Bias (%)": "{:.2f}",
+                "actual_units": "{:,.0f}",
+            }),
+            width="stretch", hide_index=True,
+        )
+        st.download_button(
+            "Download store-product forecast accuracy (CSV)",
+            data=per_series_metrics.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_store_product_forecast_accuracy.csv",
+            mime="text/csv",
+            key="download_per_series_forecast_accuracy",
+        )
+        st.caption(
+            "Metrics use the same single 30-day recursive holdout. WAPE and bias are "
+            "undefined for a series with zero actual demand. Use rolling-origin results "
+            "below to assess stability across forecast dates."
         )
     except (ValueError, ImportError) as exc:
         st.warning(f"Recursive multi-horizon evaluation is not available: {exc}")
