@@ -198,7 +198,7 @@ def test_forecast_inventory_rejects_infinite_predictions():
         "item": [101] * 10,
         "forecast_sales": [20.0] * 9 + [float("inf")],
     })
-    with pytest.raises(ValueError, match="invalid dates, identifiers or values"):
+    with pytest.raises(ValueError, match="finite numeric values"):
         calculate_inventory_recommendations(
             sales_fixture(),
             inventory_fixture(),
