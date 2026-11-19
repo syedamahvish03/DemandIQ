@@ -10,6 +10,7 @@ from forecasting import (
     chronological_baseline_backtest,
     evaluate_random_forest,
     forecast_error_by_step,
+    forecast_accuracy_by_demand_pattern,
     forecast_future_demand,
     classify_demand_patterns,
     measure_weekday_demand_variation,
@@ -548,6 +549,49 @@ with forecast_tab:
         st.caption(
             "Each point compares all store-item predictions at that exact lead day. "
             "WAPE and bias are undefined when actual demand is zero for that step."
+        )
+
+        st.subheader("Forecast accuracy by demand pattern")
+        st.write(
+            "Compare model performance for smooth, intermittent, erratic and lumpy demand. "
+            "Each product is assigned a pattern using only sales history available before "
+            "the forecast origin, avoiding holdout-data leakage."
+        )
+        pattern_metrics = forecast_accuracy_by_demand_pattern(multi_predictions, df)
+        st.plotly_chart(
+            px.line(
+                pattern_metrics,
+                x="horizon_days",
+                y="WAPE (%)",
+                color="model",
+                facet_col="demand_pattern",
+                markers=True,
+                title="Forecast WAPE by demand pattern and horizon — lower is better",
+            ),
+            width="stretch",
+        )
+        st.dataframe(
+            pattern_metrics.style.format({
+                "MAE": "{:,.2f}",
+                "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}",
+                "Bias (%)": "{:.2f}",
+                "actual_units": "{:,.1f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.download_button(
+            "Download demand-pattern forecast accuracy (CSV)",
+            data=pattern_metrics.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_forecast_accuracy_by_demand_pattern.csv",
+            mime="text/csv",
+            key="download_forecast_accuracy_by_pattern",
+        )
+        st.caption(
+            "Patterns are calculated from pre-origin history only. WAPE and bias are "
+            "undefined for groups with zero actual demand. Pattern labels are descriptive "
+            "diagnostics, not proof that demand behaviour will remain unchanged."
         )
 
         st.subheader("Forecast accuracy by store and product")
