@@ -343,3 +343,49 @@ def test_feature_builder_accepts_mixed_date_representations():
 
     assert len(features) == 50 * 4
     assert features["date"].dt.normalize().nunique() == 50
+
+
+
+def test_demand_pattern_diagnostics_classify_smooth_intermittent_erratic_lumpy_and_zero():
+    from forecasting import classify_demand_patterns
+
+    dates = pd.date_range("2025-01-01", periods=100, freq="D")
+    patterns = {
+        "smooth": [10] * 100,
+        "intermittent": [10 if index % 3 == 0 else 0 for index in range(100)],
+        "erratic": [2 if index % 2 == 0 else 20 for index in range(100)],
+        "lumpy": [2 if index % 3 == 0 else 0 for index in range(100)],
+        "no_demand": [0] * 100,
+    }
+    # Use alternating positive sizes for lumpy demand to create high nonzero CV.
+    patterns["lumpy"] = [
+        (2 if (index // 3) % 2 == 0 else 30) if index % 3 == 0 else 0
+        for index in range(100)
+    ]
+    source = pd.DataFrame([
+        {"date": date, "store": 1, "item": item, "sales": sales}
+        for item, values in patterns.items()
+        for date, sales in zip(dates, values)
+    ])
+
+    result = classify_demand_patterns(source).set_index("item")
+
+    assert result.loc["smooth", "demand_pattern"] == "smooth"
+    assert result.loc["intermittent", "demand_pattern"] == "intermittent"
+    assert result.loc["erratic", "demand_pattern"] == "erratic"
+    assert result.loc["lumpy", "demand_pattern"] == "lumpy"
+    assert result.loc["no_demand", "demand_pattern"] == "no_demand"
+    assert result.loc["intermittent", "zero_demand_days"] > 0
+    assert pd.isna(result.loc["no_demand", "ADI"])
+
+
+def test_demand_pattern_diagnostics_flags_single_nonzero_observation():
+    from forecasting import classify_demand_patterns
+
+    source = sample_daily_sales(days=50)
+    source.loc[:, "sales"] = 0
+    source.loc[source.index[0], "sales"] = 5
+
+    result = classify_demand_patterns(source)
+
+    assert result["demand_pattern"].eq("insufficient_nonzero_observations").all()
