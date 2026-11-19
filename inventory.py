@@ -125,6 +125,8 @@ def calculate_inventory_recommendations(
         )
         if forecast[["date", "store", "item", "forecast_sales"]].isna().any().any():
             raise ValueError("Demand forecast contains invalid dates, identifiers or values.")
+        if not np.isfinite(forecast["forecast_sales"].to_numpy(dtype=float)).all():
+            raise ValueError("Forecast demand must contain finite numeric values.")
         if (forecast["forecast_sales"] < 0).any():
             raise ValueError("Forecast demand cannot be negative.")
         if forecast.duplicated(["store", "item", "date"]).any():
