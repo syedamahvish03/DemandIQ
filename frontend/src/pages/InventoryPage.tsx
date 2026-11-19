@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { downloadInventoryTemplate, generateInventoryRecommendations } from "../lib/api";
 import { downloadCsv } from "../lib/csv";
 import type { InventoryResult } from "../lib/api";
+import { saveInventoryAnalysis } from "../lib/analysisRuns";
 
 type ForecastHorizon = 7 | 15 | 30;
 
@@ -16,6 +17,7 @@ export default function InventoryPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [templateLoading, setTemplateLoading] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
   async function handleTemplateDownload() {
     if (!salesFile) {
@@ -49,9 +51,19 @@ export default function InventoryPage() {
     }
     setLoading(true);
     setError("");
+    setSaveMessage("");
     setResult(null);
     try {
-      setResult(await generateInventoryRecommendations(salesFile, inventoryFile, forecastHorizon));
+      const inventoryResult = await generateInventoryRecommendations(salesFile, inventoryFile, forecastHorizon);
+      setResult(inventoryResult);
+      try {
+        await saveInventoryAnalysis(inventoryResult, salesFile.name, inventoryFile.name);
+        setSaveMessage("These inventory recommendations have been saved to your private workspace.");
+      } catch (saveError) {
+        setSaveMessage(saveError instanceof Error
+          ? `Recommendations generated, but cloud saving failed: ${saveError.message}`
+          : "Recommendations generated, but they could not be saved to your cloud workspace.");
+      }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Inventory recommendations could not be calculated.");
     } finally {
@@ -120,6 +132,7 @@ export default function InventoryPage() {
         </section>
 
         {result && <section className="forecast-results" aria-live="polite">
+          {saveMessage && <div className={saveMessage.startsWith("These inventory") ? "analysis-save-notice" : "analysis-save-warning"} role="status">{saveMessage}</div>}
           <div className="forecast-result-heading">
             <div><span className="forecast-eyebrow">INVENTORY RESULTS</span><h2>Forecast-driven replenishment</h2></div>
             <span className="forecast-success">Calculation complete</span>
