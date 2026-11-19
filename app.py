@@ -9,6 +9,7 @@ from eda import daily_sales, store_sales, summarize_sales_data, top_products, we
 from forecasting import (
     chronological_baseline_backtest,
     evaluate_random_forest,
+    forecast_error_by_step,
     forecast_future_demand,
     classify_demand_patterns,
     measure_weekday_demand_variation,
@@ -506,6 +507,47 @@ with forecast_tab:
             "The 7-, 15- and 30-day scores are cumulative from the same holdout origin. "
             "This is one final holdout, not a multi-origin rolling backtest; results describe "
             "this dataset and evaluation window only."
+        )
+
+        st.subheader("Forecast error by lead day")
+        st.write(
+            "Inspect how recursive forecast accuracy changes from day 1 through day 30. "
+            "This helps reveal whether errors grow at longer lead times instead of hiding "
+            "that behaviour inside cumulative 7-, 15- and 30-day scores."
+        )
+        step_metrics = forecast_error_by_step(multi_predictions)
+        st.plotly_chart(
+            px.line(
+                step_metrics,
+                x="forecast_step",
+                y="WAPE (%)",
+                color="model",
+                markers=True,
+                title="WAPE by forecast lead day — lower is better",
+            ),
+            width="stretch",
+        )
+        st.dataframe(
+            step_metrics.style.format({
+                "MAE": "{:,.2f}",
+                "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}",
+                "Bias (%)": "{:.2f}",
+                "actual_units": "{:,.0f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.download_button(
+            "Download forecast error by lead day (CSV)",
+            data=step_metrics.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_forecast_error_by_lead_day.csv",
+            mime="text/csv",
+            key="download_forecast_error_by_step",
+        )
+        st.caption(
+            "Each point compares all store-item predictions at that exact lead day. "
+            "WAPE and bias are undefined when actual demand is zero for that step."
         )
 
         st.subheader("Forecast accuracy by store and product")
