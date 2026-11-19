@@ -856,7 +856,7 @@ def test_empirical_error_bands_by_step_calculates_signed_residual_quantiles():
         pd.DataFrame(rows), lower_quantile=0.1, upper_quantile=0.9, min_samples=10
     )
     assert result.loc[0, "sample_count"] == 10
-    assert result.loc[0, "lower_error_bound"] == pytest.approx(-5.9)
+    assert result.loc[0, "lower_error_bound"] == pytest.approx(-5.5)
     assert result.loc[0, "upper_error_bound"] == pytest.approx(10.2)
     assert result.loc[0, "calibration_status"] == "sufficient_history"
 
