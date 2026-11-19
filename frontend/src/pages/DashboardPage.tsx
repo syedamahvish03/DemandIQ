@@ -4,6 +4,7 @@ import { useAuth } from "../lib/AuthContext";
 
 const workspaceLinks = [
   { to: "/workspace", label: "Overview", icon: BarChart3, end: true },
+  { to: "/workspace/sales", label: "Sales & imports", icon: FileUp },
   { to: "/workspace/forecasts", label: "Demand forecasts", icon: LineChart },
   { to: "/workspace/inventory", label: "Inventory planning", icon: Boxes },
   { to: "/workspace/analyses", label: "Saved analyses", icon: Clock3 },
@@ -77,7 +78,7 @@ export default function DashboardPage() {
           <section className="workspace-next-section">
             <div className="workspace-section-heading"><div><h2>Your workspace, at a glance</h2><p>These capabilities are planned next; they are not active yet.</p></div></div>
             <div className="workspace-coming-grid">
-              <article className="workspace-coming-card"><PackageSearch size={19}/><div><b>Product catalogue</b><span>Organise products and product attributes</span></div><span className="workspace-coming-tag">Coming next</span></article>
+              <Link to="/workspace/sales" className="workspace-coming-card"><FileUp size={19}/><div><b>Sales imports</b><span>Validate sales files, build your product identifiers and review import history</span></div><span className="workspace-coming-tag">Available now</span></Link>
               <article className="workspace-coming-card"><Store size={19}/><div><b>Store management</b><span>Manage store and location information</span></div><span className="workspace-coming-tag">Coming next</span></article>
               <Link to="/workspace/analyses" className="workspace-coming-card"><FileUp size={19}/><div><b>Saved analyses</b><span>Review, export or delete previous forecasts and inventory plans</span></div><span className="workspace-coming-tag">Available now</span></Link>
             </div>
