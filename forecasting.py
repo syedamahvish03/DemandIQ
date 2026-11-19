@@ -143,7 +143,7 @@ def measure_weekday_demand_variation(data: pd.DataFrame) -> pd.DataFrame:
 
     rows = []
     for (store, item), group in features.groupby(["store", "item"], sort=False):
-        weekday = group.assign(weekday=group["date"].dt.dayofweek)
+        weekday = group.assign(weekday=group["date"].dt.day_of_week)
         weekday_stats = weekday.groupby("weekday")["sales"].agg(["mean", "count"])
         counts = weekday_stats["count"].reindex(range(7), fill_value=0)
         means = weekday_stats["mean"].reindex(range(7))
