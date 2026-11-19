@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
-import { BarChart3, Boxes, CheckCircle2, Clock3, FileSpreadsheet, FileUp, LoaderCircle, ShieldCheck, UploadCloud, XCircle } from "lucide-react";
+import { BarChart3, Boxes, CheckCircle2, Clock3, FileSpreadsheet, FileUp, LoaderCircle, PackageSearch, ShieldCheck, UploadCloud, XCircle } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import { validateSalesCsv } from "../lib/api";
 import type { SalesValidationResult } from "../lib/api";
@@ -98,6 +98,7 @@ export default function SalesPage() {
         <nav className="workspace-nav" aria-label="Workspace navigation">
           <NavLink to="/workspace" end className={({ isActive }) => isActive ? "workspace-nav-link active" : "workspace-nav-link"}><BarChart3 size={17}/>Overview</NavLink>
           <NavLink to="/workspace/sales" className={({ isActive }) => isActive ? "workspace-nav-link active" : "workspace-nav-link"}><FileUp size={17}/>Sales & imports</NavLink>
+          <NavLink to="/workspace/products" className={({ isActive }) => isActive ? "workspace-nav-link active" : "workspace-nav-link"}><PackageSearch size={17}/>Products</NavLink>
           <NavLink to="/workspace/forecasts" className={({ isActive }) => isActive ? "workspace-nav-link active" : "workspace-nav-link"}><FileSpreadsheet size={17}/>Demand forecasts</NavLink>
           <NavLink to="/workspace/inventory" className={({ isActive }) => isActive ? "workspace-nav-link active" : "workspace-nav-link"}><Boxes size={17}/>Inventory planning</NavLink>
           <NavLink to="/workspace/analyses" className={({ isActive }) => isActive ? "workspace-nav-link active" : "workspace-nav-link"}><Clock3 size={17}/>Saved analyses</NavLink>
