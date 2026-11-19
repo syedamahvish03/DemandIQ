@@ -283,3 +283,22 @@ def test_sales_validation_endpoint_rejects_invalid_csv_encoding():
 
     assert response.status_code == 400
     assert "valid CSV" in response.json()["detail"]
+
+
+def test_sales_validation_endpoint_can_return_all_clean_rows_for_import():
+    response = client.post(
+        "/api/v1/sales/validate?include_records=true",
+        files={"file": ("sales.csv", BytesIO(make_sales_csv()), "text/csv")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["can_import"] is True
+    assert len(payload["preview_rows"]) == 20
+    assert len(payload["validated_rows"]) == 50
+    assert payload["validated_rows"][0] == {
+        "date": "2025-01-01",
+        "store": 1,
+        "item": 101,
+        "sales": 20,
+    }
