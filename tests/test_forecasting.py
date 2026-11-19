@@ -612,3 +612,84 @@ def test_per_series_rolling_origin_metrics_rejects_duplicate_origin_steps():
     })
     with pytest.raises(ValueError, match="one row per origin-store-item-model-forecast-step"):
         per_series_rolling_origin_metrics(predictions)
+
+
+
+def test_per_series_model_recommendations_rank_by_mean_origin_wape_and_stability():
+    from forecasting import recommend_per_series_models
+
+    metrics = pd.DataFrame([
+        {
+            "store": 1, "item": 101, "model": model, "horizon_days": 7,
+            "origins_evaluated": 3, "evaluation_rows": 21,
+            "WAPE (%)": pooled, "mean_origin_WAPE (%)": mean_wape,
+            "WAPE_std_across_origins (%)": std_wape, "actual_units": 210,
+        }
+        for model, pooled, mean_wape, std_wape in [
+            ("random_forest", 11.0, 10.0, 2.0),
+            ("seasonal_naive_7", 10.5, 10.0, 1.0),
+            ("moving_average_7", 13.0, 13.0, 3.0),
+        ]
+    ])
+
+    result = recommend_per_series_models(metrics).iloc[0]
+
+    assert result["recommended_model"] == "seasonal_naive_7"
+    assert result["runner_up_model"] == "random_forest"
+    assert result["mean_origin_WAPE (%)"] == pytest.approx(10.0)
+    assert result["WAPE_std_across_origins (%)"] == pytest.approx(1.0)
+    assert result["WAPE_gap_vs_runner_up (pp)"] == pytest.approx(0.0)
+    assert result["models_ranked"] == 3
+    assert result["selection_status"] == "recommended_by_mean_origin_wape"
+
+
+def test_per_series_model_recommendations_handles_zero_demand_without_ranking():
+    from forecasting import recommend_per_series_models
+
+    metrics = pd.DataFrame([
+        {
+            "store": 1, "item": 101, "model": model, "horizon_days": 30,
+            "origins_evaluated": 3, "evaluation_rows": 90,
+            "WAPE (%)": float("nan"), "mean_origin_WAPE (%)": float("nan"),
+            "WAPE_std_across_origins (%)": float("nan"), "actual_units": 0,
+        }
+        for model in ("random_forest", "seasonal_naive_7")
+    ])
+
+    result = recommend_per_series_models(metrics).iloc[0]
+
+    assert result["recommended_model"] is None
+    assert result["runner_up_model"] is None
+    assert result["models_ranked"] == 0
+    assert result["selection_status"] == "no_positive_demand_for_wape_ranking"
+    assert pd.isna(result["mean_origin_WAPE (%)"])
+
+
+@pytest.mark.parametrize(
+    "mutation, message",
+    [
+        ("duplicate", "one row per store-item-model-horizon"),
+        ("negative", "cannot be negative"),
+        ("invalid_horizon", "horizons must be 7, 15 or 30"),
+    ],
+)
+def test_per_series_model_recommendations_rejects_invalid_metrics(mutation, message):
+    from forecasting import recommend_per_series_models
+
+    metrics = pd.DataFrame([
+        {
+            "store": 1, "item": 101, "model": "random_forest",
+            "horizon_days": 7, "origins_evaluated": 3, "evaluation_rows": 21,
+            "WAPE (%)": 10.0, "mean_origin_WAPE (%)": 11.0,
+            "WAPE_std_across_origins (%)": 1.0, "actual_units": 210,
+        }
+    ])
+    if mutation == "duplicate":
+        metrics = pd.concat([metrics, metrics], ignore_index=True)
+    elif mutation == "negative":
+        metrics.loc[0, "mean_origin_WAPE (%)"] = -1
+    else:
+        metrics.loc[0, "horizon_days"] = 10
+
+    with pytest.raises(ValueError, match=message):
+        recommend_per_series_models(metrics)
