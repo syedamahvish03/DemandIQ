@@ -73,12 +73,7 @@ export default function SuppliersPage() {
     setError("");
     setMessage("");
     try {
-      const { data: workspace, error: workspaceError } = await supabase
-        .from("workspaces").select("id").eq("owner_id", session.user.id).single();
-      if (workspaceError) throw workspaceError;
-      const payload = {
-        workspace_id: workspace.id,
-        owner_id: session.user.id,
+      const supplierFields = {
         supplier_name: form.supplier_name.trim(),
         contact_person: form.contact_person.trim() || null,
         email: form.email.trim() || null,
@@ -87,12 +82,34 @@ export default function SuppliersPage() {
         notes: form.notes.trim() || null,
         updated_at: new Date().toISOString(),
       };
-      const request = editingId
-        ? await supabase.from("suppliers").update(payload).eq("id", editingId).eq("owner_id", session.user.id)
-        : await supabase.from("suppliers").insert(payload);
-      if (request.error) throw request.error;
+
+      if (editingId) {
+        // Update only editable supplier fields, then verify that RLS allowed a row to change.
+        const { data: updatedSupplier, error: updateError } = await supabase
+          .from("suppliers")
+          .update(supplierFields)
+          .eq("id", editingId)
+          .eq("owner_id", session.user.id)
+          .select("id")
+          .maybeSingle();
+        if (updateError) throw updateError;
+        if (!updatedSupplier) {
+          throw new Error("No supplier record was updated. Refresh the list and try again; if this continues, check the supplier table permissions.");
+        }
+      } else {
+        const { data: workspace, error: workspaceError } = await supabase
+          .from("workspaces").select("id").eq("owner_id", session.user.id).single();
+        if (workspaceError) throw workspaceError;
+        const { error: insertError } = await supabase.from("suppliers").insert({
+          ...supplierFields,
+          workspace_id: workspace.id,
+          owner_id: session.user.id,
+        });
+        if (insertError) throw insertError;
+      }
+
       resetForm();
-      setMessage(editingId ? "Supplier updated." : "Supplier added to your private workspace.");
+      setMessage(editingId ? "Supplier updated successfully." : "Supplier added to your private workspace.");
       await load();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Supplier could not be saved.");
