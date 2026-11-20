@@ -145,3 +145,50 @@ def test_processing_api_rate_limit_returns_429_and_retry_after(monkeypatch):
     assert client.get("/api/v1/health").status_code == 200
     with api_module._rate_limit_lock:
         api_module._rate_limit_buckets.clear()
+
+
+def test_rate_limiter_does_not_clear_active_clients_when_capacity_is_full(monkeypatch):
+    monkeypatch.setenv("DEMANDIQ_API_RATE_LIMIT_REQUESTS", "10")
+    monkeypatch.setenv("DEMANDIQ_API_RATE_LIMIT_WINDOW_SECONDS", "60")
+    now = api_module.time.monotonic()
+    with api_module._rate_limit_lock:
+        api_module._rate_limit_buckets.clear()
+        api_module._rate_limit_buckets.update({
+            f"active-client-{index}": (now, 1)
+            for index in range(5000)
+        })
+
+    response = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("empty.csv", BytesIO(b""), "text/csv")},
+    )
+
+    assert response.status_code == 429
+    assert "capacity" in response.json()["detail"].lower()
+    with api_module._rate_limit_lock:
+        assert len(api_module._rate_limit_buckets) == 5000
+        assert "active-client-0" in api_module._rate_limit_buckets
+        api_module._rate_limit_buckets.clear()
+
+
+def test_rate_limiter_prunes_expired_clients_before_rejecting_new_client(monkeypatch):
+    monkeypatch.setenv("DEMANDIQ_API_RATE_LIMIT_REQUESTS", "10")
+    monkeypatch.setenv("DEMANDIQ_API_RATE_LIMIT_WINDOW_SECONDS", "60")
+    expired_at = api_module.time.monotonic() - 120
+    with api_module._rate_limit_lock:
+        api_module._rate_limit_buckets.clear()
+        api_module._rate_limit_buckets.update({
+            f"expired-client-{index}": (expired_at, 1)
+            for index in range(5000)
+        })
+
+    response = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("empty.csv", BytesIO(b""), "text/csv")},
+    )
+
+    assert response.status_code == 400
+    with api_module._rate_limit_lock:
+        assert len(api_module._rate_limit_buckets) == 1
+        assert "testclient" in api_module._rate_limit_buckets
+        api_module._rate_limit_buckets.clear()
