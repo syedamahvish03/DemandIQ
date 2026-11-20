@@ -154,3 +154,194 @@ def test_forecast_inventory_rejects_duplicate_daily_predictions():
             inventory_fixture(),
             demand_forecast=forecast,
         )
+
+
+
+def test_inventory_rejects_non_finite_stock_inputs():
+    invalid = inventory_fixture().astype({"on_hand": float})
+    invalid.loc[0, "on_hand"] = float("inf")
+    with pytest.raises(ValueError, match="finite numbers"):
+        calculate_inventory_recommendations(sales_fixture(), invalid)
+
+
+def test_inventory_rejects_fractional_supplier_time_days():
+    invalid = inventory_fixture().astype({"lead_time_days": float})
+    invalid.loc[0, "lead_time_days"] = 2.5
+    with pytest.raises(ValueError, match="whole numbers of days"):
+        calculate_inventory_recommendations(sales_fixture(), invalid)
+
+
+def test_forecast_inventory_rejects_non_consecutive_forecast_dates():
+    forecast = pd.DataFrame({
+        "date": [
+            pd.Timestamp("2025-01-29"),
+            pd.Timestamp("2025-01-30"),
+            pd.Timestamp("2025-02-01"),
+            *pd.date_range("2025-02-02", periods=7, freq="D"),
+        ],
+        "store": [1] * 10,
+        "item": [101] * 10,
+        "forecast_sales": [20.0] * 10,
+    })
+    with pytest.raises(ValueError, match="consecutive daily observations"):
+        calculate_inventory_recommendations(
+            sales_fixture(),
+            inventory_fixture(),
+            demand_forecast=forecast,
+        )
+
+
+def test_forecast_inventory_rejects_infinite_predictions():
+    forecast = pd.DataFrame({
+        "date": pd.date_range("2025-01-29", periods=10, freq="D"),
+        "store": [1] * 10,
+        "item": [101] * 10,
+        "forecast_sales": [20.0] * 9 + [float("inf")],
+    })
+    with pytest.raises(ValueError, match="finite numeric values"):
+        calculate_inventory_recommendations(
+            sales_fixture(),
+            inventory_fixture(),
+            demand_forecast=forecast,
+        )
+
+
+def multi_store_sales_fixture():
+    dates = pd.date_range("2025-01-01", periods=28, freq="D")
+    rows = []
+    daily_demand = {
+        (1, 101): 10,
+        (1, 102): 20,
+        (2, 101): 30,
+        (2, 102): 40,
+    }
+    for (store, item), demand in daily_demand.items():
+        rows.extend({
+            "date": date,
+            "store": store,
+            "item": item,
+            "sales": demand,
+        } for date in dates)
+    return pd.DataFrame(rows)
+
+
+def multi_store_inventory_fixture():
+    return pd.DataFrame([
+        {
+            "store": store,
+            "item": item,
+            "on_hand": 0,
+            "on_order": 0,
+            "backorders": 0,
+            "lead_time_days": 3,
+            "review_period_days": 7,
+        }
+        for store, item in [(1, 101), (1, 102), (2, 101), (2, 102)]
+    ])
+
+
+def multi_store_forecast_fixture():
+    dates = pd.date_range("2025-01-29", periods=10, freq="D")
+    rows = []
+    daily_forecast = {
+        (1, 101): 1.0,
+        (1, 102): 2.0,
+        (2, 101): 3.0,
+        (2, 102): 4.0,
+    }
+    for (store, item), forecast_sales in daily_forecast.items():
+        rows.extend({
+            "date": date,
+            "store": store,
+            "item": item,
+            "forecast_sales": forecast_sales,
+        } for date in dates)
+    return pd.DataFrame(rows)
+
+
+def test_inventory_template_covers_multiple_stores_and_products():
+    template = build_inventory_template(multi_store_sales_fixture())
+
+    actual_pairs = set(zip(template["store"], template["item"]))
+    assert len(template) == 4
+    assert actual_pairs == {(1, 101), (1, 102), (2, 101), (2, 102)}
+    assert template[["on_hand", "on_order", "backorders",
+                     "lead_time_days", "review_period_days"]].isna().all().all()
+
+
+def test_forecast_inventory_keeps_multiple_store_product_series_separate():
+    result, metadata = calculate_inventory_recommendations(
+        multi_store_sales_fixture(),
+        multi_store_inventory_fixture(),
+        demand_forecast=multi_store_forecast_fixture(),
+    )
+
+    actual = {
+        (int(row.store), int(row.item)): row
+        for row in result.itertuples(index=False)
+    }
+    assert set(actual) == {(1, 101), (1, 102), (2, 101), (2, 102)}
+    expected = {
+        (1, 101): (3.0, 10.0, 10),
+        (1, 102): (6.0, 20.0, 20),
+        (2, 101): (9.0, 30.0, 30),
+        (2, 102): (12.0, 40.0, 40),
+    }
+    for key, (lead_demand, protection_demand, order_qty) in expected.items():
+        row = actual[key]
+        assert row.forecast_lead_demand == pytest.approx(lead_demand)
+        assert row.forecast_protection_demand == pytest.approx(protection_demand)
+        assert row.recommended_order_qty == order_qty
+        assert row.demand_basis == "future_forecast"
+    assert metadata["complete_recommendations"] == 4
+
+
+def test_forecast_inventory_rejects_a_missing_store_product_series():
+    inventory = multi_store_inventory_fixture()
+    forecast = multi_store_forecast_fixture()
+    forecast = forecast.loc[~(
+        (forecast["store"] == 2) & (forecast["item"] == 102)
+    )]
+
+    with pytest.raises(ValueError, match="No future demand forecast is available"):
+        calculate_inventory_recommendations(
+            multi_store_sales_fixture(),
+            inventory,
+            demand_forecast=forecast,
+        )
+
+
+
+
+def test_zero_historical_demand_does_not_trigger_replenishment():
+    sales = sales_fixture()
+    sales.loc[sales["item"] == 101, "sales"] = 0
+    inventory = inventory_fixture()
+    inventory.loc[0, ["on_hand", "on_order", "backorders"]] = [0, 0, 0]
+
+    result, _ = calculate_inventory_recommendations(sales, inventory)
+    row = result.iloc[0]
+
+    assert row["avg_daily_demand"] == 0
+    assert row["recommended_order_qty"] == 0
+    assert bool(row["reorder_required"]) is False
+
+
+def test_zero_future_forecast_does_not_trigger_replenishment():
+    forecast = pd.DataFrame({
+        "date": pd.date_range("2025-01-29", periods=10, freq="D"),
+        "store": [1] * 10,
+        "item": [101] * 10,
+        "forecast_sales": [0.0] * 10,
+    })
+    inventory = inventory_fixture()
+    inventory.loc[0, ["on_hand", "on_order", "backorders"]] = [0, 0, 0]
+
+    result, _ = calculate_inventory_recommendations(
+        sales_fixture(), inventory, demand_forecast=forecast
+    )
+    row = result.iloc[0]
+
+    assert row["forecast_protection_demand"] == 0
+    assert row["recommended_order_qty"] == 0
+    assert bool(row["reorder_required"]) is False

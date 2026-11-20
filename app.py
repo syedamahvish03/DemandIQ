@@ -9,7 +9,17 @@ from eda import daily_sales, store_sales, summarize_sales_data, top_products, we
 from forecasting import (
     chronological_baseline_backtest,
     evaluate_random_forest,
+    empirical_error_bands_by_step,
+    forecast_error_by_step,
+    forecast_accuracy_by_demand_pattern,
     forecast_future_demand,
+    classify_demand_patterns,
+    measure_weekday_demand_variation,
+    per_series_forecast_metrics,
+    per_series_rolling_origin_metrics,
+    recommend_per_series_models,
+    recursive_multi_horizon_backtest,
+    rolling_origin_multi_horizon_backtest,
 )
 from inventory import (
     build_illustrative_inventory_inputs,
@@ -253,6 +263,91 @@ with forecast_tab:
         )
 
     st.divider()
+    st.subheader("Demand pattern diagnostics")
+    st.write(
+        "Demand patterns are classified per store-item using average demand interval "
+        "(ADI) and squared coefficient of variation (CV²). These diagnostics help "
+        "identify intermittent and irregular demand; they do not change forecast outputs."
+    )
+
+    @st.cache_data(show_spinner="Classifying demand patterns by store and product...")
+    def run_demand_pattern_diagnostics(data: pd.DataFrame):
+        return classify_demand_patterns(data)
+
+    try:
+        demand_patterns = run_demand_pattern_diagnostics(df)
+        pattern_counts = (
+            demand_patterns["demand_pattern"].value_counts().rename_axis("demand_pattern")
+            .reset_index(name="store_item_series")
+        )
+        st.dataframe(pattern_counts, width="stretch", hide_index=True)
+        with st.expander("View store-item demand diagnostics", expanded=False):
+            st.dataframe(
+                demand_patterns.style.format({"ADI": "{:.2f}", "CV_squared": "{:.2f}"}),
+                width="stretch",
+                hide_index=True,
+            )
+        st.download_button(
+            "Download demand pattern diagnostics (CSV)",
+            data=demand_patterns.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_demand_pattern_diagnostics.csv",
+            mime="text/csv",
+            key="download_demand_pattern_diagnostics",
+        )
+        st.caption(
+            "Classification thresholds: ADI 1.32 and CV² 0.49. No-demand and "
+            "insufficient-observation series are separated instead of being forced "
+            "into a demand class. These are descriptive diagnostics, not a Croston forecast."
+        )
+    except ValueError as exc:
+        st.warning(f"Demand pattern diagnostics are not available: {exc}")
+
+    st.divider()
+    st.subheader("Weekday demand variation")
+    st.write(
+        "This diagnostic compares each store-item's average sales across Monday to Sunday. "
+        "It reports the dispersion of those seven weekday averages only when there are at "
+        "least four observations for every weekday."
+    )
+
+    @st.cache_data(show_spinner="Measuring weekday demand variation...")
+    def run_weekday_variation_diagnostic(data: pd.DataFrame):
+        return measure_weekday_demand_variation(data)
+
+    try:
+        weekday_variation = run_weekday_variation_diagnostic(df)
+        weekday_summary = (
+            weekday_variation["weekday_analysis_status"]
+            .value_counts()
+            .rename_axis("analysis_status")
+            .reset_index(name="store_item_series")
+        )
+        st.dataframe(weekday_summary, width="stretch", hide_index=True)
+        with st.expander("View weekday variation by store and product", expanded=False):
+            st.dataframe(
+                weekday_variation.style.format({
+                    "weekday_mean_dispersion_pct": "{:.2f}"
+                }),
+                width="stretch",
+                hide_index=True,
+            )
+        st.download_button(
+            "Download weekday variation diagnostics (CSV)",
+            data=weekday_variation.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_weekday_variation_diagnostics.csv",
+            mime="text/csv",
+            key="download_weekday_variation_diagnostics",
+        )
+        st.caption(
+            "Higher dispersion means weekday average sales differ more; it is not proof of "
+            "weekly seasonality. Trends, promotions, holidays and other effects can influence "
+            "the metric. Insufficient-history and zero-demand series are reported separately. "
+            "This diagnostic does not change forecasts or inventory calculations."
+        )
+    except ValueError as exc:
+        st.warning(f"Weekday variation diagnostics are not available: {exc}")
+
+    st.divider()
     st.subheader("Forecast evaluation — Simple baselines")
     st.write(
         "DemandIQ creates historical lag and rolling-average features separately for each store-item "
@@ -297,8 +392,9 @@ with forecast_tab:
             width="stretch",
         )
         st.caption(
-            "These are benchmark results, not a claim of future accuracy. The test is a rolling "
-            "one-step-ahead evaluation; a later stage will compare a machine-learning model on the same dates."
+            "These are benchmark results, not a claim of future accuracy. This section uses "
+            "rolling one-step-ahead evaluation; the recursive multi-horizon section below evaluates "
+            "the production-style 7-, 15- and 30-day forecasting task."
         )
     except ValueError as exc:
         st.warning(f"Baseline evaluation is not available for this dataset: {exc}")
@@ -363,6 +459,385 @@ with forecast_tab:
         )
     except (ValueError, ImportError) as exc:
         st.warning(f"Random Forest evaluation is not available: {exc}")
+
+    st.divider()
+    st.subheader("Recursive multi-horizon evaluation — 7, 15 and 30 days")
+    st.write(
+        "This is the production-aligned comparison. Each model forecasts the complete "
+        "30-day holdout recursively: predictions from earlier holdout days become inputs "
+        "for later days. Actual holdout sales are never fed back into a model."
+    )
+
+    @st.cache_data(show_spinner="Running recursive 7-, 15- and 30-day model evaluation...")
+    def run_multi_horizon_backtest(data: pd.DataFrame):
+        return recursive_multi_horizon_backtest(data)
+
+    try:
+        multi_metrics, multi_predictions, multi_metadata = run_multi_horizon_backtest(df)
+        h1, h2, h3 = st.columns(3)
+        h1.metric("Holdout period", f"{multi_metadata['holdout_start']} to {multi_metadata['holdout_end']}")
+        h2.metric("Store-item series", f"{multi_metadata['series_count']:,}")
+        h3.metric("Training rows", f"{multi_metadata['training_rows_used']:,}")
+
+        st.dataframe(
+            multi_metrics.style.format({
+                "MAE": "{:,.2f}", "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}", "Bias (%)": "{:.2f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.plotly_chart(
+            px.line(
+                multi_metrics,
+                x="horizon_days",
+                y="WAPE (%)",
+                color="model",
+                markers=True,
+                title="WAPE by forecast horizon — lower is better",
+            ),
+            width="stretch",
+        )
+        st.download_button(
+            "Download recursive multi-horizon metrics (CSV)",
+            data=multi_metrics.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_recursive_multi_horizon_metrics.csv",
+            mime="text/csv",
+            key="download_multi_horizon_metrics",
+        )
+        st.caption(
+            "The 7-, 15- and 30-day scores are cumulative from the same holdout origin. "
+            "This is one final holdout, not a multi-origin rolling backtest; results describe "
+            "this dataset and evaluation window only."
+        )
+
+        st.subheader("Forecast error by lead day")
+        st.write(
+            "Inspect how recursive forecast accuracy changes from day 1 through day 30. "
+            "This helps reveal whether errors grow at longer lead times instead of hiding "
+            "that behaviour inside cumulative 7-, 15- and 30-day scores."
+        )
+        step_metrics = forecast_error_by_step(multi_predictions)
+        st.plotly_chart(
+            px.line(
+                step_metrics,
+                x="forecast_step",
+                y="WAPE (%)",
+                color="model",
+                markers=True,
+                title="WAPE by forecast lead day — lower is better",
+            ),
+            width="stretch",
+        )
+        st.dataframe(
+            step_metrics.style.format({
+                "MAE": "{:,.2f}",
+                "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}",
+                "Bias (%)": "{:.2f}",
+                "actual_units": "{:,.0f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.download_button(
+            "Download forecast error by lead day (CSV)",
+            data=step_metrics.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_forecast_error_by_lead_day.csv",
+            mime="text/csv",
+            key="download_forecast_error_by_step",
+        )
+        st.caption(
+            "Each point compares all store-item predictions at that exact lead day. "
+            "WAPE and bias are undefined when actual demand is zero for that step."
+        )
+
+        st.subheader("Forecast accuracy by demand pattern")
+        st.write(
+            "Compare model performance for smooth, intermittent, erratic and lumpy demand. "
+            "Each product is assigned a pattern using only sales history available before "
+            "the forecast origin, avoiding holdout-data leakage."
+        )
+        pattern_metrics = forecast_accuracy_by_demand_pattern(multi_predictions, df)
+        st.plotly_chart(
+            px.line(
+                pattern_metrics,
+                x="horizon_days",
+                y="WAPE (%)",
+                color="model",
+                facet_col="demand_pattern",
+                markers=True,
+                title="Forecast WAPE by demand pattern and horizon — lower is better",
+            ),
+            width="stretch",
+        )
+        st.dataframe(
+            pattern_metrics.style.format({
+                "MAE": "{:,.2f}",
+                "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}",
+                "Bias (%)": "{:.2f}",
+                "actual_units": "{:,.1f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.download_button(
+            "Download demand-pattern forecast accuracy (CSV)",
+            data=pattern_metrics.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_forecast_accuracy_by_demand_pattern.csv",
+            mime="text/csv",
+            key="download_forecast_accuracy_by_pattern",
+        )
+        st.caption(
+            "Patterns are calculated from pre-origin history only. WAPE and bias are "
+            "undefined for groups with zero actual demand. Pattern labels are descriptive "
+            "diagnostics, not proof that demand behaviour will remain unchanged."
+        )
+
+        st.subheader("Forecast accuracy by store and product")
+        st.write(
+            "Aggregate scores can hide weak individual products. This breakdown reports "
+            "recursive errors separately for every store-item series, model and horizon."
+        )
+        per_series_metrics = per_series_forecast_metrics(multi_predictions)
+        series_models = sorted(per_series_metrics["model"].unique().tolist())
+        selected_series_model = st.selectbox(
+            "Model for store-product accuracy", series_models,
+            key="per_series_accuracy_model",
+        )
+        selected_series_metrics = per_series_metrics.loc[
+            per_series_metrics["model"] == selected_series_model
+        ]
+        st.dataframe(
+            selected_series_metrics.style.format({
+                "MAE": "{:,.2f}", "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}", "Bias (%)": "{:.2f}",
+                "actual_units": "{:,.0f}",
+            }),
+            width="stretch", hide_index=True,
+        )
+        st.download_button(
+            "Download store-product forecast accuracy (CSV)",
+            data=per_series_metrics.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_store_product_forecast_accuracy.csv",
+            mime="text/csv",
+            key="download_per_series_forecast_accuracy",
+        )
+        st.caption(
+            "Metrics use the same single 30-day recursive holdout. WAPE and bias are "
+            "undefined for a series with zero actual demand. Use rolling-origin results "
+            "below to assess stability across forecast dates."
+        )
+    except (ValueError, ImportError) as exc:
+        st.warning(f"Recursive multi-horizon evaluation is not available: {exc}")
+
+    st.divider()
+    st.subheader("Rolling-origin reliability evaluation")
+    st.write(
+        "DemandIQ repeats the same recursive 30-day evaluation at three historical forecast "
+        "origins, spaced 15 days apart. Each origin trains only on data available before its "
+        "own holdout. Metrics are reported for cumulative 7-, 15- and 30-day horizons."
+    )
+
+    @st.cache_data(show_spinner="Evaluating three historical forecast origins...")
+    def run_rolling_origin_backtest(data: pd.DataFrame):
+        return rolling_origin_multi_horizon_backtest(
+            data, n_origins=3, step_days=15
+        )
+
+    try:
+        rolling_metrics, rolling_predictions, rolling_metadata = run_rolling_origin_backtest(df)
+        r1, r2, r3 = st.columns(3)
+        r1.metric("Historical origins", rolling_metadata["origins_evaluated"])
+        r2.metric("Days between origins", rolling_metadata["origin_spacing_days"])
+        r3.metric("Forecast window per origin", f"{rolling_metadata['holdout_days_per_origin']} days")
+
+        st.dataframe(
+            rolling_metrics.style.format({
+                "MAE": "{:,.2f}",
+                "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}",
+                "Bias (%)": "{:.2f}",
+                "mean_origin_WAPE (%)": "{:.2f}",
+                "WAPE_std_across_origins (%)": "{:.2f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.plotly_chart(
+            px.line(
+                rolling_metrics,
+                x="horizon_days",
+                y="WAPE (%)",
+                color="model",
+                markers=True,
+                title="Pooled WAPE across rolling origins — lower is better",
+            ),
+            width="stretch",
+        )
+        origin_stability = (
+            rolling_metrics[
+                ["model", "horizon_days", "mean_origin_WAPE (%)", "WAPE_std_across_origins (%)"]
+            ]
+        )
+
+        st.subheader("Historical forecast error bands by lead day")
+        st.write(
+            "Estimate the central 90% range of historical signed forecast errors at each "
+            "recursive lead day. These empirical bands help show uncertainty growth by horizon."
+        )
+        error_bands = empirical_error_bands_by_step(
+            rolling_predictions, lower_quantile=0.05, upper_quantile=0.95, min_samples=20
+        )
+        band_model_options = sorted(error_bands["model"].unique().tolist())
+        selected_band_model = st.selectbox(
+            "Model for historical error bands",
+            band_model_options,
+            key="historical_error_band_model",
+        )
+        selected_error_bands = error_bands.loc[
+            error_bands["model"] == selected_band_model
+        ].copy()
+        sufficient_bands = selected_error_bands.loc[
+            selected_error_bands["calibration_status"] == "sufficient_history"
+        ]
+        if not sufficient_bands.empty:
+            st.plotly_chart(
+                px.line(
+                    sufficient_bands,
+                    x="forecast_step",
+                    y=["lower_error_bound", "upper_error_bound"],
+                    markers=True,
+                    title="Empirical 5th–95th percentile signed error by lead day (units)",
+                ),
+                width="stretch",
+            )
+        st.dataframe(
+            selected_error_bands.style.format({
+                "lower_error_bound": "{:,.2f}",
+                "upper_error_bound": "{:,.2f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.download_button(
+            "Download historical forecast error bands (CSV)",
+            data=error_bands.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_historical_forecast_error_bands.csv",
+            mime="text/csv",
+            key="download_historical_error_bands",
+        )
+        st.caption(
+            "Bands are empirical residual quantiles from the evaluated rolling origins, "
+            "not guaranteed prediction intervals or formal confidence intervals. Steps with "
+            "fewer than 20 historical predictions are marked insufficient and not charted."
+        )
+        st.subheader("Forecast error stability across origins")
+        st.dataframe(
+            origin_stability.style.format({
+                "mean_origin_WAPE (%)": "{:.2f}",
+                "WAPE_std_across_origins (%)": "{:.2f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.subheader("Rolling-origin forecast accuracy by store and product")
+        per_series_rolling = per_series_rolling_origin_metrics(rolling_predictions)
+        rolling_models = sorted(per_series_rolling["model"].unique().tolist())
+        selected_rolling_model = st.selectbox(
+            "Model for store-product rolling-origin analysis",
+            rolling_models,
+            key="rolling_origin_series_model",
+        )
+        selected_rolling_series = per_series_rolling.loc[
+            per_series_rolling["model"] == selected_rolling_model
+        ]
+        st.dataframe(
+            selected_rolling_series.style.format({
+                "MAE": "{:,.2f}",
+                "RMSE": "{:,.2f}",
+                "WAPE (%)": "{:.2f}",
+                "Bias (%)": "{:.2f}",
+                "mean_origin_WAPE (%)": "{:.2f}",
+                "WAPE_std_across_origins (%)": "{:.2f}",
+                "actual_units": "{:,.1f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.download_button(
+            "Download store-product rolling-origin metrics (CSV)",
+            data=per_series_rolling.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_store_product_rolling_origin_metrics.csv",
+            mime="text/csv",
+            key="download_store_product_rolling_origin_metrics",
+        )
+        st.caption(
+            "These per-series scores combine recursive forecast errors across the historical "
+            "origins. Mean and standard deviation of origin WAPE show how accuracy varies by "
+            "forecast date; zero-demand origins are excluded from percentage-error stability "
+            "statistics. Overlapping holdout windows are not independent."
+        )
+
+        st.subheader("Per-product model selection guidance")
+        st.write(
+            "For each store-product and forecast horizon, DemandIQ ranks the evaluated models "
+            "by mean WAPE across historical origins. Lower is better; cross-origin variability "
+            "breaks ties. This is a recommendation from backtest evidence, not an automatic "
+            "change to the production forecast model."
+        )
+        model_recommendations = recommend_per_series_models(per_series_rolling)
+        recommendation_horizon = st.selectbox(
+            "Forecast horizon for model recommendations",
+            [7, 15, 30],
+            index=0,
+            format_func=lambda days: f"{days} days",
+            key="per_series_model_recommendation_horizon",
+        )
+        horizon_recommendations = model_recommendations.loc[
+            model_recommendations["horizon_days"] == recommendation_horizon
+        ]
+        st.dataframe(
+            horizon_recommendations.style.format({
+                "mean_origin_WAPE (%)": "{:.2f}",
+                "WAPE_std_across_origins (%)": "{:.2f}",
+                "runner_up_mean_origin_WAPE (%)": "{:.2f}",
+                "WAPE_gap_vs_runner_up (pp)": "{:.2f}",
+                "pooled_WAPE (%)": "{:.2f}",
+                "actual_units": "{:,.1f}",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        st.download_button(
+            "Download per-product model recommendations (CSV)",
+            data=model_recommendations.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_per_product_model_recommendations.csv",
+            mime="text/csv",
+            key="download_per_series_model_recommendations",
+        )
+        st.caption(
+            "A recommendation is unavailable when every candidate's percentage-error metric "
+            "is undefined, such as a series with zero actual demand across all evaluated origins. "
+            "Validate recommendations on additional history before operational use."
+        )
+        st.download_button(
+            "Download rolling-origin evaluation (CSV)",
+            data=rolling_metrics.to_csv(index=False).encode("utf-8"),
+            file_name="demandiq_rolling_origin_evaluation.csv",
+            mime="text/csv",
+            key="download_rolling_origin_metrics",
+        )
+        st.caption(
+            f"Origins run from {rolling_metadata['first_origin_start']} to "
+            f"{rolling_metadata['last_origin_start']}. Holdout windows overlap because "
+            "origins are 15 days apart and each forecast window is 30 days. Pooled scores "
+            "therefore summarize forecast errors across these historical origins; they are "
+            "not statistically independent observations."
+        )
+    except (ValueError, ImportError) as exc:
+        st.warning(f"Rolling-origin evaluation is not available for this dataset: {exc}")
 
 with inventory_tab:
     st.subheader("Inventory planning — Reorder analysis")

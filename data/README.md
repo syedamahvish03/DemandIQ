@@ -1,6 +1,6 @@
 # Dataset notes
 
-The application currently starts with generated **synthetic demonstration data** so the dashboard can run before a real dataset is downloaded.
+The committed starter/demo workflow uses generated **synthetic demonstration data** so the dashboard can run before a real dataset is downloaded. The 50-row demo CSV imported during local UI testing is not a representative benchmark dataset and must not be used to claim general model performance.
 
 ## Planned starter dataset
 

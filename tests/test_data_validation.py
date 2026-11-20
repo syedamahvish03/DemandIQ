@@ -49,3 +49,73 @@ def test_duplicate_rows_are_flagged_but_retained():
     cleaned, report = validate_sales_data(source)
     assert len(cleaned) == 2
     assert report["duplicate_rows"] == 1
+
+
+def test_non_finite_sales_values_are_excluded_and_reported():
+    source = pd.DataFrame({
+        "date": ["2025-01-01", "2025-01-02", "2025-01-03", "2025-01-04"],
+        "store": [1, 1, 1, 1],
+        "item": [101, 101, 101, 101],
+        "sales": [10, float("inf"), float("-inf"), 12],
+    })
+
+    cleaned, report = validate_sales_data(source)
+
+    assert cleaned["sales"].tolist() == [10.0, 12.0]
+    assert report["invalid_sales"] == 2
+    assert report["negative_sales"] == 0
+    assert report["rows_valid"] == 2
+    assert any("non-finite sales" in warning for warning in report["warnings"])
+
+
+
+def test_blank_identifiers_are_excluded_and_text_identifiers_are_trimmed():
+    source = pd.DataFrame({
+        "date": ["2025-01-01", "2025-01-02", "2025-01-03"],
+        "store": [" STORE_A ", "   ", "STORE_B"],
+        "item": [" ITEM_1 ", "ITEM_1", ""],
+        "sales": [10, 12, 14],
+    })
+
+    cleaned, report = validate_sales_data(source)
+
+    assert len(cleaned) == 1
+    assert cleaned.loc[0, "store"] == "STORE_A"
+    assert cleaned.loc[0, "item"] == "ITEM_1"
+    assert report["missing_identifiers"] == 2
+    assert report["rows_valid"] == 1
+    assert any("missing store or item identifier" in warning for warning in report["warnings"])
+
+
+
+def test_duplicate_daily_keys_with_different_sales_are_flagged():
+    source = pd.DataFrame({
+        "date": ["2025-01-01 09:00:00", "2025-01-01 18:00:00", "2025-01-02 00:00:00"],
+        "store": ["STORE_A", "STORE_A", "STORE_A"],
+        "item": ["ITEM_1", "ITEM_1", "ITEM_1"],
+        "sales": [10, 15, 12],
+    })
+
+    cleaned, report = validate_sales_data(source)
+
+    assert len(cleaned) == 3
+    assert report["duplicate_rows"] == 1
+    assert any("duplicate daily store-item date" in warning for warning in report["warnings"])
+
+
+def test_mixed_date_formats_are_parsed_without_excluding_valid_rows():
+    source = pd.DataFrame({
+        "date": ["2025-01-01", "2025-01-02 09:30:00", "2025-01-03"],
+        "store": ["STORE_A", "STORE_A", "STORE_A"],
+        "item": ["ITEM_1", "ITEM_1", "ITEM_1"],
+        "sales": [10, 12, 14],
+    })
+
+    cleaned, report = validate_sales_data(source)
+
+    assert len(cleaned) == 3
+    assert report["invalid_dates"] == 0
+    assert report["rows_valid"] == 3
+    assert cleaned["date"].dt.strftime("%Y-%m-%d").tolist() == [
+        "2025-01-01", "2025-01-02", "2025-01-03"
+    ]
