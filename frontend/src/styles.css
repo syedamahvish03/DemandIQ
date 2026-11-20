@@ -554,3 +554,127 @@ body{background:#f4f6fc}
 @media(prefers-reduced-motion:reduce){
   .workspace-action-card,.workspace-coming-card,.analysis-card,.forecast-upload,.data-export-button{transition:none}
 }
+
+
+/* DemandIQ premium workspace refinement — CSS-only, behaviour-preserving */
+:root{
+  --di-shadow-sm:0 5px 18px rgba(24,36,76,.045);
+  --di-shadow-md:0 14px 38px rgba(24,36,76,.075);
+  --di-radius:17px;
+}
+.workspace-shell{background:#f3f5fb}
+.workspace-content{max-width:1320px}
+.workspace-topbar{position:sticky;top:0;z-index:5;box-shadow:0 4px 18px rgba(24,36,76,.025)}
+.workspace-welcome{margin-bottom:30px}
+.workspace-welcome h1{letter-spacing:-1.5px}
+.workspace-section-heading{gap:18px}
+.workspace-section-heading>div{min-width:0}
+.workspace-action-card,.workspace-coming-card,.sales-summary-card,.sales-panel-card,.forecast-card,.forecast-results,.inventory-insights,.analysis-card{
+  box-shadow:var(--di-shadow-sm);
+  transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;
+}
+.sales-summary-card,.sales-panel-card,.forecast-card,.forecast-results,.inventory-insights,.analysis-card{border-radius:var(--di-radius)}
+.sales-summary-card{position:relative;overflow:hidden;padding:20px;background:linear-gradient(145deg,#fff,#fafbff)}
+.sales-summary-card:after{content:"";position:absolute;width:92px;height:92px;right:-38px;top:-44px;border-radius:50%;background:rgba(103,111,231,.075)}
+.sales-summary-card>span{letter-spacing:1.15px;color:#7a83a2}
+.sales-summary-card strong{font-size:27px;letter-spacing:-.8px}
+.sales-panel-card{padding:26px;background:linear-gradient(145deg,#fff 0%,#fcfcff 100%)}
+.sales-panel-heading{align-items:center}
+.sales-panel-heading h2{font-size:19px;letter-spacing:-.6px}
+.sales-file-limit{border:1px solid #e2e6ff;background:#f2f3ff;color:#6669d6}
+.sales-quality-grid>div{border-radius:11px;background:linear-gradient(145deg,#fbfcff,#f6f7fd);padding:14px}
+.sales-quality-grid strong{font-size:20px;letter-spacing:-.4px}
+.sales-history-row{padding:15px 4px}
+.sales-history-row:hover{background:#fafbff}
+.sales-history-icon{border-radius:11px;background:linear-gradient(145deg,#f0f1ff,#e8edff)}
+.sales-import-status{border:1px solid #f3e2c9}
+.sales-import-status.complete{border-color:#d4eee2}
+.product-form,.supplier-form{gap:15px}
+.product-form label,.supplier-form label{font-size:10px;letter-spacing:.1px;color:#475570}
+.product-form input,.product-search,.supplier-form input,.supplier-form textarea,.forecast-field select,.forecast-select{
+  min-height:43px;border-radius:10px;background:#fcfdff;
+  transition:border-color .18s,box-shadow .18s,background .18s;
+}
+.product-form input:hover,.product-search:hover,.supplier-form input:hover,.supplier-form textarea:hover,.forecast-field select:hover,.forecast-select:hover{border-color:#c4cbed}
+.product-form input:focus,.product-search:focus,.supplier-form input:focus,.supplier-form textarea:focus,.forecast-field select:focus,.forecast-select:focus{background:#fff}
+.product-form-actions button,.sales-import-actions button{border-radius:10px}
+.product-row-actions button{min-height:32px;padding:6px 10px;border-radius:8px;font-weight:700}
+.forecast-container{width:min(1040px,100%)}
+.forecast-heading{max-width:760px;margin-top:38px;margin-bottom:29px}
+.forecast-heading h1{font-size:clamp(32px,4vw,46px);letter-spacing:-2.1px}
+.forecast-heading p{font-size:12px;line-height:1.85;max-width:680px}
+.forecast-page-links{padding-bottom:5px}
+.forecast-back{font-size:10px;font-weight:700}
+.forecast-card,.forecast-results{padding:29px}
+.forecast-field-label{font-size:11px;color:#34415f;letter-spacing:.1px}
+.forecast-upload{min-height:166px;border-width:1.5px;border-radius:14px;gap:11px}
+.forecast-upload svg{width:29px;height:29px;filter:drop-shadow(0 4px 7px rgba(91,105,222,.15))}
+.forecast-upload strong{font-size:13px}
+.forecast-upload span{font-size:10px}
+.forecast-format-note{border:1px solid #e3e8ff;border-radius:11px;background:linear-gradient(110deg,#f2f3ff,#f5f9ff);font-size:10px}
+.forecast-submit{min-height:49px;border-radius:11px;font-size:11px;letter-spacing:.1px}
+.forecast-results{margin-top:25px}
+.forecast-result-heading h2{font-size:23px;letter-spacing:-.7px}
+.forecast-stats{gap:12px}
+.forecast-stats>div{min-height:84px;padding:15px;border-radius:11px;background:linear-gradient(145deg,#fafbff,#f3f5fc)}
+.forecast-stats small{font-size:8px;letter-spacing:.85px}
+.forecast-stats strong{font-size:17px;letter-spacing:-.3px}
+.forecast-success{border:1px solid #d4eee2;font-weight:700}
+.forecast-trend{border-radius:15px;box-shadow:var(--di-shadow-sm)}
+.forecast-trend-chart{height:210px}
+.forecast-trend-bar{width:min(29px,75%);border-radius:6px 6px 1px 1px;box-shadow:0 4px 10px rgba(89,112,225,.15)}
+.inventory-template-row{padding:17px;border-radius:12px;background:linear-gradient(110deg,#fafbff,#f4f6fc)}
+.inventory-insights{padding:23px}
+.inventory-insights-heading h3{font-size:18px;letter-spacing:-.45px}
+.inventory-alert-item{padding:14px;border-radius:12px;box-shadow:0 4px 12px rgba(60,43,34,.035)}
+.inventory-explanation-grid>div{min-height:86px;padding:13px;border-radius:10px;background:linear-gradient(145deg,#fbfcff,#f4f6fc)}
+.inventory-explanation-grid b{font-size:9px;letter-spacing:.1px}
+.inventory-explanation-grid span{font-size:9px;line-height:1.7}
+.forecast-table-wrap{background:#fff;box-shadow:var(--di-shadow-sm)}
+.forecast-table{font-size:10px}
+.forecast-table th{position:sticky;top:0;padding:14px 13px;background:#f2f4fb;color:#5e6b89;font-size:8px;letter-spacing:.8px;text-transform:uppercase}
+.forecast-table td{padding:14px 13px;font-variant-numeric:tabular-nums}
+.forecast-table tbody tr:nth-child(even){background:#fcfcff}
+.forecast-table tbody tr:hover{background:#f3f5ff}
+.forecast-table td:last-child{font-weight:700}
+.analysis-card{padding:22px;border-radius:16px}
+.analysis-card:hover{transform:translateY(-3px);border-color:#cdd3f6}
+.analysis-card-icon{width:44px;height:44px;border-radius:13px;background:linear-gradient(145deg,#f0f1ff,#e7ebff)}
+.analysis-card-title-row h2{font-size:15px;letter-spacing:-.25px}
+.analysis-card-summary{gap:8px}
+.analysis-card-summary span{padding:6px 8px;border:1px solid #edf0f7;border-radius:7px;background:#fafbfe}
+.analysis-details summary{display:inline-flex;padding:7px 0;color:#5968bd}
+.analysis-details pre{border:1px solid #e8ebf4;border-radius:10px}
+.analyses-list-heading{align-items:center;padding:7px 2px}
+.analyses-empty{border-style:dashed;background:linear-gradient(145deg,#fff,#fafbff)}
+.supplier-form-card h2{font-size:19px;letter-spacing:-.5px}
+.supplier-form textarea{line-height:1.6}
+.supplier-form input::placeholder,.supplier-form textarea::placeholder,.product-form input::placeholder,.product-search::placeholder{color:#a1aabd}
+.workspace-signout{cursor:pointer}
+.workspace-nav-link:focus-visible,.button:focus-visible,.forecast-back:focus-visible,.workspace-action-card:focus-visible,.workspace-coming-card:focus-visible{
+  outline:3px solid rgba(112,119,235,.38);outline-offset:3px;
+}
+button:disabled{cursor:not-allowed}
+@media(max-width:900px){
+  .workspace-content{padding-left:25px;padding-right:25px}
+  .sales-panel-card{padding:21px}
+  .forecast-container{width:min(100%,850px)}
+}
+@media(max-width:650px){
+  .workspace-topbar{position:relative}
+  .workspace-content{padding:22px 15px 40px}
+  .workspace-hero-panel{box-shadow:0 14px 35px rgba(34,47,104,.14)}
+  .sales-summary-card{padding:16px}
+  .sales-panel-card,.forecast-card,.forecast-results{padding:18px}
+  .sales-panel-heading{align-items:flex-start;flex-direction:column}
+  .forecast-heading h1{font-size:32px}
+  .forecast-upload{min-height:145px;padding:17px}
+  .forecast-stats{gap:8px}
+  .forecast-stats>div{padding:12px}
+  .forecast-result-heading{align-items:flex-start}
+  .forecast-result-heading h2{font-size:19px}
+  .inventory-insights{padding:17px}
+  .inventory-explanation-grid{gap:7px}
+  .analysis-card{padding:16px;gap:11px}
+  .analysis-card-summary span{font-size:8px}
+}
