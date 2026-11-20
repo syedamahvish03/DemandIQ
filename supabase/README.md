@@ -16,6 +16,7 @@ saved forecast and inventory results.
 7. Repeat the same process with `migrations/20261119000200_create_sales_import_foundation.sql`.
 8. Confirm both migrations complete successfully before testing Sales & imports or Product catalogue.
 9. Apply `migrations/20261119000300_create_workspace_suppliers.sql` to enable the supplier directory.
+10. Apply `migrations/20261120164007_add_foreign_key_supporting_indexes.sql` to add indexes supporting foreign-key lookups.
 
 The migrations:
 - create `public.workspaces` and `public.analysis_runs`;
@@ -38,6 +39,6 @@ analysis run from being attached to another user's workspace.
 
 The SQL files must be applied manually in the Supabase SQL Editor; pushing the
 migration files to GitHub does not execute them. The frontend import and
-catalogue screens require the second migration. Apply all three migrations in
-filename order, then test the workflows with a non-production/sample CSV first.
+catalogue screens require the second migration. Apply all four migrations in
+filename order, then test the workflows with a non-production/sample CSV first. The final migration is an index-only performance improvement; do not manually re-run migrations already recorded as applied.
 Original source files are private and accessible only to their owning account.
