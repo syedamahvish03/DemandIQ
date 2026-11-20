@@ -8,7 +8,9 @@ from io import BytesIO
 from fastapi.responses import Response
 
 import pandas as pd
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+import httpx
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -60,6 +62,66 @@ def get_allowed_origins() -> list[str]:
     return [origin for origin in origins if origin]
 
 
+security = HTTPBearer(auto_error=False)
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> dict:
+    """Validate a Supabase access token against the Supabase Auth user endpoint."""
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication is required to use this processing endpoint.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    publishable_key = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
+    if not supabase_url or not publishable_key:
+        logger.error("Supabase API authentication is not configured.")
+        raise HTTPException(
+            status_code=503,
+            detail="Authentication service is not configured.",
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                f"{supabase_url}/auth/v1/user",
+                headers={
+                    "apikey": publishable_key,
+                    "Authorization": f"Bearer {credentials.credentials}",
+                },
+            )
+    except httpx.RequestError:
+        logger.warning("Unable to reach Supabase Auth to validate an API access token.")
+        raise HTTPException(
+            status_code=503,
+            detail="Authentication service is temporarily unavailable.",
+        ) from None
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=401,
+            detail="The authentication token is invalid or has expired.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        user = response.json()
+    except ValueError:
+        user = None
+    if not isinstance(user, dict) or not user.get("id"):
+        raise HTTPException(
+            status_code=401,
+            detail="The authentication service returned an invalid user.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return {"id": str(user["id"])}
+
+
 app = FastAPI(
     title="DemandIQ API",
     description="Backend API for the DemandIQ retail intelligence platform.",
@@ -71,7 +133,7 @@ app.add_middleware(
     allow_origins=get_allowed_origins(),
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["Accept", "Content-Type"],
+    allow_headers=["Accept", "Content-Type", "Authorization"],
 )
 
 
@@ -135,6 +197,7 @@ def health_check() -> dict[str, str]:
 async def create_forecast(
     file: UploadFile = File(..., description="Historical sales CSV file"),
     horizon_days: int = Form(7),
+    _current_user: dict = Depends(get_current_user),
 ) -> dict:
     """Validate uploaded sales history and generate a future demand forecast."""
     if horizon_days not in ALLOWED_HORIZONS:
@@ -226,6 +289,7 @@ def _read_csv_upload(raw_bytes: bytes, label: str) -> pd.DataFrame:
 async def validate_sales_upload(
     file: UploadFile = File(..., description="Historical sales CSV file to preview before import"),
     include_records: bool = False,
+    _current_user: dict = Depends(get_current_user),
 ) -> dict:
     """Validate a sales CSV and return a safe preview without persisting uploaded data."""
     if not (file.filename or "").strip().lower().endswith(".csv"):
@@ -265,6 +329,7 @@ async def validate_sales_upload(
 @app.post("/api/v1/inventory/template", tags=["Inventory"])
 async def create_inventory_template(
     sales_file: UploadFile = File(..., description="Validated historical sales CSV"),
+    _current_user: dict = Depends(get_current_user),
 ) -> Response:
     """Create a blank stock-input template for the store-item pairs in sales history."""
     if not (sales_file.filename or "").lower().endswith(".csv"):
@@ -293,6 +358,7 @@ async def create_inventory_recommendations(
     lookback_days: int = Form(28),
     service_level_z: float = Form(1.65),
     forecast_horizon_days: int | None = Form(None),
+    _current_user: dict = Depends(get_current_user),
 ) -> dict:
     """Generate inventory guidance; forecast mode is opt-in for API compatibility."""
     if forecast_horizon_days is not None and forecast_horizon_days not in ALLOWED_HORIZONS:
