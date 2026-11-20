@@ -37,15 +37,16 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 ### Live Supabase audit (20 November 2026)
 - [x] Connected directly to the intended Supabase project; project status reported `ACTIVE_HEALTHY`.
 - [x] Live schema inspection confirmed all six application tables have RLS enabled and the expected owner/workspace foreign-key relationships.
-- [x] Live Storage inspection confirmed `sales-imports` is private, has a 10 MB limit, and has authenticated-user INSERT/SELECT/DELETE policies scoped to the first folder segment matching `auth.uid()`.
+- [x] Live Storage inspection confirmed `sales-imports` is private, has a 10 MB limit, and allows CSV MIME types with authenticated-user INSERT/SELECT/DELETE policies scoped to the first folder segment matching `auth.uid()`.
+- [x] Reviewed the only public-schema function: `create_demandiq_workspace_for_new_user()` is a SECURITY DEFINER trigger function with an empty `search_path`, fully qualified table reference, no EXECUTE privilege for `anon` or `authenticated`, and an enabled auth-user creation trigger.
 - [x] Under an authenticated SQL role with Account B's user ID, the visible row counts were 1 workspace and 1 product, with 0 imports, sales records, suppliers, analysis runs and private Storage objects. This is an additional read-isolation signal, not exhaustive record-ID or write-path testing.
 - [x] Added and verified migration `20261120164007_add_foreign_key_supporting_indexes` with 10 child-side indexes for the foreign-key relationships flagged by Supabase's performance advisor. A fresh advisor run no longer reports unindexed foreign keys.
-- [ ] Supabase security advisor still reports leaked-password protection disabled. Enable it in Supabase Auth password security settings before production.
+- [ ] Supabase security advisor reports leaked-password protection disabled. Supabase confirms this feature is restricted to the Pro plan; it cannot be enabled on the current Free plan. Record as a known plan limitation and reassess before production rather than treating it as a user setup failure.
 - [ ] The performance advisor now reports only unused-index INFO notices on this low-volume project. Do not remove indexes solely on this early-usage signal; reassess with representative production workload.
 
 ### Backup and recovery
 - [x] Supabase Dashboard was checked; it states that managed project backups are not included on the current Free plan.
-- [ ] No independent database export/backup and restore drill has been completed. This is a known release risk. Before production or real business data, establish scheduled independent backups and test restoration.
+- [ ] No independent database export/backup and restore drill has been completed. This is a known release risk. Supabase documentation recommends regular `supabase db dump` exports and off-site backups for Free-tier projects. Database dumps do not include Storage objects, which require a separate backup process. Complete a restore drill before production or real business data.
 
 ### Data Science evaluation
 - [x] Reproducible evaluation runner added at `scripts/run_release_evaluation.py`.
@@ -93,7 +94,7 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 - [ ] Exercise failed/partial sales imports and confirm no misleading completed import remains.
 - [x] Duplicate daily store-item keys are included in validation blockers before import; a separate live UI test of a duplicate-file rejection remains to be captured.
 - [ ] Verify failed imports do not leave inaccessible source files or misleading product/sales records.
-- [ ] Establish an independent backup/export schedule and complete a restore drill before production use. Supabase Free currently provides no managed project backups.
+- [ ] Establish an independent database export schedule using the Supabase CLI `db dump` workflow, store backups off-site, separately back up Storage objects, and complete a restore drill before production use. Supabase Free currently provides no managed project backups.
 - [ ] Confirm deletion behaviour and foreign-key cascades with test records.
 
 ### E. UI, accessibility and performance
