@@ -1,6 +1,6 @@
 # DemandIQ Web Frontend
 
-This is the Stage 1 React + TypeScript + Vite product-shell implementation. It is intentionally separate from the existing Streamlit MVP.
+The React + TypeScript + Vite frontend is the authenticated DemandIQ product workspace and installable PWA.
 
 ## Requirements
 
@@ -12,23 +12,39 @@ This is the Stage 1 React + TypeScript + Vite product-shell implementation. It i
 From this directory:
 
 ```powershell
-npm install
+npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite (normally http://localhost:5173).
+Create `.env.local` from `.env.example` and configure the Supabase project URL, Supabase publishable key, and API base URL. Never put a Supabase secret/service-role key in a Vite environment variable.
 
-## Available routes
+## Main routes
 
-- `/` — public DemandIQ landing page
-- `/login` — authentication interface preview
-- `/signup` — account creation interface preview
+- `/` — public product landing page
+- `/login`, `/signup` — Supabase email authentication
+- `/workspace` — protected overview
+- `/workspace/sales` — sales CSV validation, import and history
+- `/workspace/products` — product catalogue
+- `/workspace/suppliers` — supplier reference directory
+- `/workspace/forecasts` — demand forecasts
+- `/workspace/inventory` — inventory planning
+- `/workspace/analyses` — saved analysis history and exports
 
-## Stage 1 boundaries
+## Build and verify
 
-- Login and sign-up screens are visual previews only. They do not authenticate users, create accounts, or store credentials.
-- Dashboard metrics in the landing-page product mockup are illustrative sample values.
-- No customer data, database, Supabase, or backend API is connected yet.
-- Authentication, workspace isolation, database policies, and PWA installation are later stages.
+```powershell
+npm ci
+npm run build
+npm run preview
+```
 
-The existing Streamlit application at the repository root remains unchanged.
+The production build is served by Vite preview (normally http://localhost:4173). The PWA service worker is registered only in production builds. Forecasting and inventory calculations require the FastAPI service and network access; the PWA does not provide full offline operation.
+
+## Data and security boundaries
+
+- Supabase Auth manages browser sessions; protected routes require a valid session.
+- Supabase Row Level Security protects workspace data. Do not bypass RLS or expose service-role credentials in the browser.
+- Sales source CSVs are stored in the private `sales-imports` bucket.
+- The supplier directory is reference information only; it does not automatically fill inventory inputs or create purchase orders.
+- The FastAPI processing API is stateless and currently does not validate Supabase access tokens. It has a per-process rate limit; production hosting must additionally enforce distributed rate limits and request/time limits.
+- Store management and multi-user workspace membership are not implemented in this MVP.
