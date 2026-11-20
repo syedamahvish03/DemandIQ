@@ -1,12 +1,15 @@
 """DemandIQ FastAPI application entry point."""
 import logging
 import os
+import threading
+import time
 from io import BytesIO
 
 from fastapi.responses import Response
 
 import pandas as pd
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from data_validation import validate_sales_data
@@ -23,6 +26,29 @@ DEFAULT_ALLOWED_ORIGINS = (
 )
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 ALLOWED_HORIZONS = (7, 15, 30)
+
+
+RATE_LIMITED_PATHS = {
+    "/api/v1/forecasts",
+    "/api/v1/sales/validate",
+    "/api/v1/inventory/template",
+    "/api/v1/inventory/recommendations",
+}
+_rate_limit_lock = threading.Lock()
+_rate_limit_buckets: dict[str, tuple[float, int]] = {}
+
+
+def _rate_limit_settings() -> tuple[int, int]:
+    """Return safe per-process request and time-window limits."""
+    try:
+        limit = int(os.getenv("DEMANDIQ_API_RATE_LIMIT_REQUESTS", "120"))
+        window = int(os.getenv("DEMANDIQ_API_RATE_LIMIT_WINDOW_SECONDS", "60"))
+    except ValueError:
+        return 120, 60
+    if limit < 1 or window < 1:
+        return 120, 60
+    return limit, window
+
 
 
 def get_allowed_origins() -> list[str]:
@@ -47,6 +73,36 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Accept", "Content-Type"],
 )
+
+
+@app.middleware("http")
+async def limit_processing_requests(request: Request, call_next):
+    """Apply a conservative per-client abuse limit to CPU/memory-heavy upload APIs.
+
+    This in-process guard is defense in depth. Production deployments must also
+    enforce distributed limits and body/time limits at the hosting edge.
+    """
+    if request.method == "POST" and request.url.path in RATE_LIMITED_PATHS:
+        client_host = request.client.host if request.client else "unknown"
+        now = time.monotonic()
+        limit, window = _rate_limit_settings()
+        with _rate_limit_lock:
+            started_at, count = _rate_limit_buckets.get(client_host, (now, 0))
+            if now - started_at >= window:
+                started_at, count = now, 0
+            if count >= limit:
+                retry_after = max(1, int(window - (now - started_at)))
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Too many processing requests. Please wait before trying again."},
+                    headers={"Retry-After": str(retry_after)},
+                )
+            _rate_limit_buckets[client_host] = (started_at, count + 1)
+            if len(_rate_limit_buckets) > 5000:
+                _rate_limit_buckets.clear()
+                _rate_limit_buckets[client_host] = (started_at, count + 1)
+    return await call_next(request)
+
 
 
 @app.get("/", tags=["System"])
