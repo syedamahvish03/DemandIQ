@@ -26,3 +26,6 @@ frontend/tsconfig.tsbuildinfo
 .env
 .env.*
 !.env.example
+
+# Generated Stage 6 evaluation outputs (keep datasets/results local)
+results/release_evaluation/
