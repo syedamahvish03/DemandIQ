@@ -1,6 +1,6 @@
 # DemandIQ Stage 6 — Release Readiness Checklist
 
-This document tracks verification for the React + FastAPI product on `feature/product-architecture`. A feature is not considered verified merely because its code or database policy exists. Status below distinguishes repository/CI evidence, user-observed local checks and remaining production-only work.
+This document tracks verification for the React + FastAPI product. Stage 6 implementation and automated verification are complete for the agreed development scope. Remaining unchecked items are production-specific deployment gates or deferred manual assurance tasks; they must be addressed according to risk before unrestricted public launch. A feature is not considered verified merely because its code or database policy exists.
 
 ## Current implementation snapshot
 
@@ -65,7 +65,7 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 - [ ] Preserve the generated result files locally or in the user's own research archive. Generated evaluation outputs are intentionally gitignored and were not committed.
 - Note: although all 913,000 rows were validated and profiled, each evaluation run used a 200,000-row training subset as recorded in the evaluation metadata. Do not claim all 913,000 rows were used to fit each model.
 
-## Stage 6 work items
+## Deferred production and extended assurance work
 
 ### A. Automated regression and API validation
 - [x] Existing Python unit and FastAPI tests pass in CI.
@@ -121,9 +121,9 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 - [ ] Complete production configuration and hosting-specific deployment checklist.
 - [ ] Obtain explicit approval before production deployment; deployment is a separate final phase after Stage 6.
 
-## Release acceptance criteria
+## Production deployment acceptance criteria
 
-Stage 6 must not be marked complete until:
+Stage 6 development and automated-verification scope is complete. Before unrestricted public production launch, address or explicitly accept the following:
 1. Automated tests and frontend production build pass.
 2. Critical browser workflows pass on the local production preview.
 3. Cross-account database and Storage isolation tests pass, including direct object access checks.
@@ -132,4 +132,4 @@ Stage 6 must not be marked complete until:
 6. Real-dataset model-comparison evidence is recorded reproducibly.
 7. Documentation and environment/secret checks are complete.
 
-Production deployment and live end-to-end verification remain a separate final phase and require explicit user approval. No production deployment, merge to `main`, or Supabase data mutation is authorized by this checklist.
+Production deployment and live end-to-end verification remain a separate final phase and require explicit user approval. A merge to `main` is a source-control handoff only; it does not deploy the application or mutate the Supabase project. No production deployment or Supabase data mutation is authorized by this checklist.
