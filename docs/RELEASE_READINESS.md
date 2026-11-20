@@ -14,6 +14,12 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 - Supplier records are a reference directory. They do not automatically populate inventory input CSVs or create purchase orders.
 - Store management is not implemented.
 
+## Automated security and regression verification — 21 November 2026
+
+- [x] GitHub Actions run #198 on commit `1afc6968b40b2dab065616e64c7812b0a3699502` completed successfully. Its job completed Python dependency installation, the full configured pytest suite, Python syntax compilation, frontend dependency installation and the TypeScript/Vite production build.
+- [x] First GitHub CodeQL analysis run completed successfully on the same commit. Python and JavaScript/TypeScript initialization, autobuild and analysis steps all completed successfully.
+- Note: a successful CodeQL run confirms the configured analysis completed; it is not proof that no vulnerabilities exist. Dependency advisory review, production configuration, and the remaining release acceptance checks below are still separate.
+
 ## Verified evidence as of 20 November 2026
 
 ### Automated and local checks
