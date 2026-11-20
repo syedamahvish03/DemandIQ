@@ -107,3 +107,17 @@ def test_processing_endpoint_fails_closed_when_supabase_auth_is_unconfigured(mon
     )
     assert response.status_code == 503
     assert "not configured" in response.json()["detail"]
+
+
+def test_cors_preflight_allows_authorization_header_for_configured_frontend():
+    response = client.options(
+        "/api/v1/forecasts",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert "authorization" in response.headers["access-control-allow-headers"].lower()
