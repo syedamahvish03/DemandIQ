@@ -44,7 +44,9 @@ A passing CI run verifies the covered automated checks only. It does not prove S
 
 ### C. API exposure and abuse controls
 - [x] Add configurable in-process rate limiting to CPU/memory-heavy API routes, with a 429 response and `Retry-After` header.
-- [ ] Decide how production FastAPI endpoints will be protected against anonymous resource abuse (for example, hosting-level rate limits and request-size/time limits, and/or authenticated API access).
+- [x] Document the API trust boundary: endpoints are stateless and do not access user workspace records; public deployment must be protected against anonymous resource abuse.
+- [x] Add and test a configurable in-process per-client rate limiter (120 requests / 60 seconds by default) for all four processing endpoints.
+- [ ] Configure and verify distributed edge/hosting rate limits, request-body limits (including multipart overhead), execution timeouts and concurrency limits before public deployment.
 - [ ] Apply exact production CORS origins; never treat CORS as an authentication control.
 - [ ] Verify request-size limits and practical processing limits under concurrent or repeated requests.
 - [ ] Confirm API logs do not include uploaded CSV contents, credentials or personal data.
@@ -66,7 +68,8 @@ A passing CI run verifies the covered automated checks only. It does not prove S
 - [ ] Preserve reproducible evaluation commands and result tables for the report.
 
 ### F. UI, accessibility and performance
-- [ ] Verify dashboard, imports, catalogue, suppliers, forecasts, inventory and saved analyses at desktop, tablet and mobile widths.
+- [x] User visually reviewed the desktop workspace pages after the shared-layout correction.
+- [ ] Verify dashboard, imports, catalogue, suppliers, forecasts, inventory and saved analyses at tablet and mobile widths.
 - [ ] Check keyboard navigation, visible focus, labels, contrast, reduced-motion behaviour and screen-reader semantics.
 - [ ] Test larger realistic CSV files within the documented 10 MB and 100,000-row limits.
 - [ ] Verify empty, loading, success and error states for all workflows.
@@ -74,7 +77,8 @@ A passing CI run verifies the covered automated checks only. It does not prove S
 ### G. Documentation and release
 - [x] Update root and backend setup/security documentation to reflect the current product.
 - [ ] Review all remaining docs for outdated architecture and feature claims.
-- [ ] Complete environment-variable and secret review.
+- [x] Repository scan confirms frontend example environment contains only public Supabase URL/publishable-key placeholders; `.env*` files are ignored except `.env.example`.
+- [ ] Verify the actual local environment files and production secret store contain no service-role key in frontend configuration, build output or browser requests.
 - [ ] Complete production configuration and deployment checklist.
 - [ ] Obtain explicit approval before production deployment; deployment is a separate final phase after Stage 6.
 
