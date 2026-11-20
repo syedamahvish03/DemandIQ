@@ -9,6 +9,7 @@ import ProductsPage from "./pages/ProductsPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import AuthPage from "./components/AuthPage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import WorkspaceLayout from "./components/WorkspaceLayout";
 import { Link, Route, Routes } from "react-router-dom";
 import {
   ArrowDownRight, ArrowRight, BarChart3, Boxes, Check,
@@ -162,12 +163,12 @@ export default function App() {
     <Route path="/login" element={<AuthPage mode="login"/>}/>
     <Route path="/signup" element={<AuthPage mode="signup"/>}/>
     <Route path="/workspace" element={<ProtectedRoute><DashboardPage/></ProtectedRoute>}/>
-    <Route path="/workspace/sales" element={<ProtectedRoute><SalesPage/></ProtectedRoute>}/>
-    <Route path="/workspace/products" element={<ProtectedRoute><ProductsPage/></ProtectedRoute>}/>
-    <Route path="/workspace/suppliers" element={<ProtectedRoute><SuppliersPage/></ProtectedRoute>}/>
-    <Route path="/workspace/forecasts" element={<ProtectedRoute><ForecastPage/></ProtectedRoute>}/>
-    <Route path="/workspace/inventory" element={<ProtectedRoute><InventoryPage/></ProtectedRoute>}/>
-    <Route path="/workspace/analyses" element={<ProtectedRoute><AnalysesPage/></ProtectedRoute>}/>
+    <Route path="/workspace/sales" element={<ProtectedRoute><WorkspaceLayout><SalesPage/></WorkspaceLayout></ProtectedRoute>}/>
+    <Route path="/workspace/products" element={<ProtectedRoute><WorkspaceLayout><ProductsPage/></WorkspaceLayout></ProtectedRoute>}/>
+    <Route path="/workspace/suppliers" element={<ProtectedRoute><WorkspaceLayout><SuppliersPage/></WorkspaceLayout></ProtectedRoute>}/>
+    <Route path="/workspace/forecasts" element={<ProtectedRoute><WorkspaceLayout><ForecastPage/></WorkspaceLayout></ProtectedRoute>}/>
+    <Route path="/workspace/inventory" element={<ProtectedRoute><WorkspaceLayout><InventoryPage/></WorkspaceLayout></ProtectedRoute>}/>
+    <Route path="/workspace/analyses" element={<ProtectedRoute><WorkspaceLayout><AnalysesPage/></WorkspaceLayout></ProtectedRoute>}/>
     <Route path="*" element={<HomePage/>}/>
   </Routes>;
 }
