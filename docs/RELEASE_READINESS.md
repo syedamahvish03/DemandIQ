@@ -57,7 +57,8 @@ A passing CI run verifies the covered automated checks only. It does not prove S
 - [ ] Confirm deletion behaviour and foreign-key cascades are understood.
 
 ### E. Data Science evidence
-- [ ] Run the existing comparative evaluation on the selected real retail dataset.
+- [x] Add a reproducible CLI runner for real-dataset recursive multi-horizon and rolling-origin evaluation (`scripts/run_release_evaluation.py`).
+- [ ] Run the evaluation runner on the selected real retail dataset and review the exported results.
 - [ ] Record dataset source, row count, date coverage, number of store-item series and preprocessing decisions.
 - [ ] Report Random Forest against seasonal-naive and moving-average baselines at 7-, 15- and 30-day horizons.
 - [ ] Include MAE, RMSE, WAPE and bias, plus rolling-origin variability.
