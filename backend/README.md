@@ -35,6 +35,12 @@ Health check: `http://127.0.0.1:8000/api/v1/health`. Interactive API docs: `http
 - Invalid dates, non-finite or negative sales, missing identifiers, duplicate daily keys and irregular forecasting series are validated rather than silently treated as valid observations.
 - Stock counts, supplier lead times and review periods must be explicitly supplied and pass validation.
 
+## API request limits
+
+The processing endpoints apply a configurable in-process per-client rate limit. Defaults are 120 requests per 60 seconds per client IP. Configure `DEMANDIQ_API_RATE_LIMIT_REQUESTS` and `DEMANDIQ_API_RATE_LIMIT_WINDOW_SECONDS` for local/single-process deployments. Responses over the limit return HTTP 429 with a `Retry-After` header.
+
+This is defense in depth, not a distributed production abuse-control system: counters are local to one process and reset on restart. A production host or edge proxy must additionally enforce distributed rate limits, request-body size limits (including multipart overhead), connection/time limits and appropriate concurrency controls. Do not rely on CORS or this in-memory limiter as authentication.
+
 ## CORS
 
 Development defaults allow `http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:4173` and `http://127.0.0.1:4173`.
