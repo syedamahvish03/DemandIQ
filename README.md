@@ -2,117 +2,139 @@
 
 **AI-Powered Retail Demand Forecasting & Inventory Intelligence**
 
-DemandIQ is a portfolio MVP that explores retail sales, forecasts product demand, and translates forecasts into practical replenishment guidance for small and medium retailers.
+DemandIQ is a retail-planning application that combines historical sales analysis, machine-learning demand forecasts and inventory replenishment calculations. It is designed as a portfolio MVP for small and medium retailers.
 
-## Current status
+## Product status
 
-Core portfolio MVP stages include validated sales-data upload, exploratory analysis, chronological baseline and Random Forest evaluation, and inventory planning. Inventory results can run in an explicitly labelled illustrative scenario or from verified retailer-supplied stock data.
+The React + FastAPI product is implemented on the `feature/product-architecture` branch. Stage 0–5 implementation is complete. Stage 6 hardening and release readiness is in progress. Production deployment and live verification are a separate final phase.
 
-## Implemented MVP capabilities
+The original Streamlit application remains in the repository as the reference MVP.
 
-- Retail sales CSV upload, validation and data-quality reporting
-- Exploratory analysis of products, stores, daily sales and weekday patterns
-- Leakage-aware time-series features and chronological baseline evaluation
-- Random Forest evaluation against the same chronological holdout
-- Recursive 7-, 15-, and 30-day future demand forecasts
-- Forecast-driven lead-time demand, reorder-point and suggested-order calculations
-- Clearly labelled illustrative inventory scenarios or retailer-supplied inventory inputs
-- Downloadable forecast, model-comparison, inventory-template and recommendation CSV files
+## Current product capabilities
+
+- Supabase email authentication and protected React workspace.
+- Personal workspace records protected by Supabase Row Level Security (RLS).
+- Sales CSV validation, preview, import history and private source-file storage.
+- Workspace product catalogue and supplier reference directory.
+- 7-, 15- and 30-day recursive Random Forest demand forecasts.
+- Seasonal-naive and moving-average baselines, chronological evaluation and rolling-origin multi-horizon backtesting in the Python research workflow.
+- Forecast-driven inventory planning using actual user-provided stock, incoming orders, backorders, supplier lead time and review period.
+- Reorder alerts, calculation explanations, saved analyses and CSV exports.
+- Installable PWA with a limited offline navigation fallback. Forecasting and inventory calculations still require the backend and are not available offline.
 
 ## Technology
 
-Python, Streamlit, Pandas, NumPy, Plotly, Scikit-learn, and Statsmodels.
+- Frontend: React, TypeScript, Vite, React Router and CSS.
+- API: Python, FastAPI, Pandas, NumPy and Scikit-learn.
+- Research/reference app: Streamlit, Plotly and the shared Python domain modules.
+- Data services: Supabase Auth, PostgreSQL, Row Level Security and private Supabase Storage.
+- Automation: GitHub Actions.
+
+## Repository structure
+
+- `frontend/` — authenticated web application and PWA.
+- `backend/` — FastAPI application and API tests.
+- Root Python modules — data validation, EDA, forecasting and inventory logic shared with the Streamlit reference app.
+- `supabase/migrations/` — ordered database and storage policies.
+- `docs/` — product architecture, user guidance and release documentation.
 
 ## Run locally (Windows PowerShell)
 
-1. Install Python 3.11 or newer.
-2. Clone this repository and open its folder in VS Code.
-3. Create and activate a virtual environment:
+### 1. Python environment and API
+
+From the repository root:
 
 ```powershell
-py -m venv .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-4. Install dependencies:
-
-```powershell
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+pip install -r backend/requirements.txt
+python -m uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-5. Start the app:
+API health check: `http://127.0.0.1:8000/api/v1/health`.
+
+### 2. Frontend
+
+Open a second terminal:
 
 ```powershell
-streamlit run app.py
+cd frontend
+npm ci
+npm run dev
 ```
 
-## CSV format
+Create `frontend/.env.local` using `frontend/.env.example` as a guide. Configure the Supabase project URL and publishable/anon key. Never put a Supabase service-role key in frontend environment variables.
 
-Required columns: date, store, item, sales.
+The Vite development app normally runs at `http://localhost:5173`.
 
-- date: valid date
-- store: store identifier
-- item: product identifier
-- sales: non-negative units sold
+### 3. Supabase database
 
-Example:
+Apply the migrations in order to the intended Supabase project:
 
-```csv
-date,store,item,sales
-2025-01-01,1,101,24
-2025-01-02,1,101,19
-2025-01-01,1,102,13
-```
+1. `20261119000100_create_user_workspaces.sql`
+2. `20261119000200_create_sales_import_foundation.sql`
+3. `20261119000300_create_workspace_suppliers.sql`
 
-## Data and modelling integrity
+Do not re-run migrations that are already applied unless the migration process explicitly requires it. Keep project secrets out of Git.
 
-Demo data is synthetic and labelled as such. Model performance will be reported only after chronological validation against a baseline. Inventory inputs such as on-hand stock and supplier lead time will be configurable or explicitly illustrative unless supplied by a dataset.
+## Data inputs
 
-See [the user guide](docs/USER_GUIDE.md), [the eight-day project plan](docs/PROJECT_PLAN.md), and [dataset notes](data/README.md).
+### Historical sales CSV
 
-## Run automated tests
+Required columns: `date,store,item,sales`.
 
-Activate the project virtual environment, then run:
+Each store-item series needs at least 15 consecutive daily observations for forecasting. The validation workflow reports invalid or excluded rows and blocks duplicate daily store-item keys from import.
+
+### Inventory CSV
+
+The inventory template contains:
+
+- `store`, `item`: identifiers matching the sales history.
+- `on_hand`: current physical stock.
+- `on_order`: incoming units already ordered.
+- `backorders`: units owed to customers.
+- `lead_time_days`: supplier delivery time.
+- `review_period_days`: time until the next stock review.
+
+Inventory values are supplied by the retailer; DemandIQ does not infer actual stock or automatically place purchase orders. Supplier directory records are reference information and do not automatically populate inventory inputs.
+
+## Modelling integrity and limitations
+
+- Forecasting uses lagged sales, rolling means and calendar features.
+- Production forecasts are recursive multi-step forecasts; one-step evaluation is not presented as equivalent to recursive forecast performance.
+- The research workflow compares Random Forest with seasonal-naive and moving-average baselines using chronological and rolling-origin evaluation.
+- No accuracy or business-impact percentage should be claimed without a documented real-dataset evaluation.
+- Promotions, price changes, holidays, stockouts and future external events are not automatically modelled unless represented in the input features.
+- Empirical error summaries are not formal prediction intervals.
+- Inventory calculations are decision-support estimates, not purchase orders or guarantees against stockouts.
+
+## Security and release boundary
+
+Supabase Auth protects the frontend workspace. Workspace-owned tables use RLS, and the sales source-file bucket is private with user-folder policies.
+
+The FastAPI forecast and inventory endpoints currently process uploaded CSVs statelessly and do not themselves verify a Supabase user token or persist user records. Before unrestricted public production exposure, Stage 6 must complete API abuse/rate-limit and deployment-access decisions. Do not interpret database RLS as authentication for the stateless API.
+
+## Tests
+
+From the repository root:
 
 ```powershell
 python -m pytest -q
+python -m py_compile app.py
 ```
 
-GitHub Actions runs the test suite automatically on pushes to `main` and pull requests targeting `main`.
+For the frontend:
 
+```powershell
+cd frontend
+npm ci
+npm run build
+```
 
-## Inventory planning inputs
+GitHub Actions runs Python tests, the Streamlit syntax check and the frontend production build on pushes to the configured branches.
 
-The inventory section uses recent observed sales to estimate average daily demand and variability. It requires a separate inventory-input CSV with these columns:
+## Documentation
 
-- `store`, `item`: identifiers matching the sales CSV
-- `on_hand`: current physical stock
-- `on_order`: units already ordered and expected
-- `backorders`: units owed to customers
-- `lead_time_days`: supplier lead time in days
-- `review_period_days`: days until the next planned stock review
-
-Use the app's **Illustrative demo scenario** to demonstrate the calculation workflow without claiming to have real stock data. Its starting stock is derived from recent average sales multiplied by a user-selected stock-cover assumption; incoming orders and backorders are assumed to be zero, and lead time/review period are scenario settings. Alternatively, select **Upload verified inventory data** and provide actual retailer values. The blank template is only for future use with verified inventory records. The calculation uses a 28-day observed-sales window and a 1.65 service-level z factor:
-
-- Safety stock = 1.65 × daily demand standard deviation × √(lead time)
-- Reorder point = average daily demand × lead time + safety stock
-- Inventory position = on-hand + on-order − backorders
-- Target stock = average daily demand × (lead time + review period) + safety stock
-- Suggested order quantity = max(0, target stock − inventory position), rounded up
-
-These are planning estimates, not purchase orders. In illustrative mode, every stock and supplier value is an assumption and results are simulated for demonstration only. Validate stock counts, supplier constraints, pack sizes, promotions and the appropriateness of the service-level assumption before acting. The starter Kaggle sales dataset does not contain stock-on-hand, purchase orders, backorders or supplier lead-time fields.
-
-
-## Forecast-driven inventory planning
-
-In the Inventory planning tab, generate a 7-, 15- or 30-day future demand forecast before calculating recommendations. The selected forecast must cover at least the supplier lead time plus review period for each inventory row.
-
-- Forecast lead-time demand = sum of predicted daily demand over the lead-time window
-- Forecast protection-period demand = sum of predicted daily demand over lead time + review period
-- Safety stock = 1.65 × historical daily demand standard deviation × √(lead time)
-- Reorder point = forecast lead-time demand + safety stock
-- Target stock = forecast protection-period demand + safety stock
-- Suggested order quantity = max(0, target stock − inventory position), rounded up
-
-The historical demand window is still used to estimate variability for safety stock. In illustrative mode, starting stock, zero incoming orders, zero backorders, lead time and review period remain assumptions. Forecasts and resulting inventory quantities are planning demonstrations, not verified stock records or purchase advice.
+See `docs/PRODUCT_ARCHITECTURE.md` for the roadmap and `backend/README.md` for API endpoint details.
