@@ -49,17 +49,25 @@ export default function DashboardPage() {
         </header>
 
         <div className="workspace-content">
-          <div className="workspace-welcome">
-            <div>
-              <span className="forecast-eyebrow">WORKSPACE OVERVIEW</span>
-              <h1>Welcome, {firstName}.</h1>
-              <p>Your retail planning workspace is ready. Choose a workflow to get started.</p>
+          <section className="workspace-hero-panel">
+            <div className="workspace-hero-orb workspace-hero-orb-one" />
+            <div className="workspace-hero-orb workspace-hero-orb-two" />
+            <div className="workspace-hero-copy">
+              <span className="workspace-hero-kicker"><span /> YOUR RETAIL INTELLIGENCE WORKSPACE</span>
+              <h1>Good to see you, {firstName}.</h1>
+              <p>Your sales, demand forecasts and inventory decisions come together here. Choose a workflow and turn your data into your next move.</p>
+              <div className="workspace-hero-chips"><span><LineChart size={13}/> Demand intelligence</span><span><Boxes size={13}/> Inventory planning</span><span><ShieldCheck size={13}/> Private workspace</span></div>
             </div>
-            <div className="workspace-date"><Clock3 size={15}/>{new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(new Date())}<PwaInstallPrompt /></div>
-          </div>
+            <div className="workspace-hero-meta">
+              <div className="workspace-hero-date"><Clock3 size={15}/><span>{new Intl.DateTimeFormat(undefined, { dateStyle: "full" }).format(new Date())}</span></div>
+              <PwaInstallPrompt />
+              <div className="workspace-hero-orbit-icon"><TrendingUp size={29}/></div>
+              <span className="workspace-hero-meta-caption">PLAN AHEAD WITH CLARITY</span>
+            </div>
+          </section>
 
           <section className="workspace-start-section">
-            <div className="workspace-section-heading"><div><h2>Plan your next move</h2><p>Use your own sales and inventory files to generate business insights.</p></div></div>
+            <div className="workspace-section-heading"><div><span className="workspace-section-kicker">START HERE</span><h2>Choose your next move</h2><p>Start with a demand forecast or go straight to inventory replenishment.</p></div><span className="workspace-section-aside">TWO CORE WORKFLOWS <ArrowRight size={13}/></span></div>
             <div className="workspace-action-grid">
               <Link to="/workspace/forecasts" className="workspace-action-card">
                 <span className="workspace-action-icon blue"><LineChart size={21}/></span>
@@ -79,7 +87,7 @@ export default function DashboardPage() {
           </section>
 
           <section className="workspace-next-section">
-            <div className="workspace-section-heading"><div><h2>Your workspace, at a glance</h2><p>Manage your sales data and products, then explore the tools already available in your workspace.</p></div></div>
+            <div className="workspace-section-heading"><div><span className="workspace-section-kicker">WORKSPACE TOOLS</span><h2>Everything in its place</h2><p>Manage the information that powers your forecasts and replenishment plans.</p></div></div>
             <div className="workspace-coming-grid">
               <Link to="/workspace/sales" className="workspace-coming-card"><FileUp size={19}/><div><b>Sales imports</b><span>Validate sales files, build your product identifiers and review import history</span></div><span className="workspace-coming-tag">Available now</span></Link>
               <Link to="/workspace/suppliers" className="workspace-coming-card"><Building2 size={19}/><div><b>Supplier directory</b><span>Maintain supplier contacts and default lead-time references</span></div><span className="workspace-coming-tag">Available now</span></Link>
