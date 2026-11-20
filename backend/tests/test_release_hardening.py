@@ -83,9 +83,17 @@ def test_inventory_template_rejects_non_csv_and_empty_uploads():
 
 
 def test_inventory_recommendations_reject_non_csv_and_empty_inventory_uploads():
-    from tests_helpers import make_sales_csv_for_hardening
+    import pandas as pd
 
-    sales = ("sales.csv", BytesIO(make_sales_csv_for_hardening()), "text/csv")
+    dates = pd.date_range("2025-01-01", periods=35, freq="D")
+    frame = pd.DataFrame({
+        "date": dates.strftime("%Y-%m-%d"),
+        "store": ["STORE_A"] * 35,
+        "item": ["SKU_100"] * 35,
+        "sales": [10 + (index % 4) for index in range(35)],
+    })
+    sales_bytes = frame.to_csv(index=False).encode("utf-8")
+    sales = ("sales.csv", BytesIO(sales_bytes), "text/csv")
     wrong_extension = client.post(
         "/api/v1/inventory/recommendations",
         files={
@@ -97,7 +105,7 @@ def test_inventory_recommendations_reject_non_csv_and_empty_inventory_uploads():
     empty_inventory = client.post(
         "/api/v1/inventory/recommendations",
         files={
-            "sales_file": ("sales.csv", BytesIO(make_sales_csv_for_hardening()), "text/csv"),
+            "sales_file": ("sales.csv", BytesIO(sales_bytes), "text/csv"),
             "inventory_file": ("inventory.csv", BytesIO(b""), "text/csv"),
         },
     )
