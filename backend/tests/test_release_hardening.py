@@ -3,6 +3,7 @@ from io import BytesIO
 
 from fastapi.testclient import TestClient
 
+import backend.app.main as api_module
 from backend.app.main import app, get_allowed_origins
 
 client = TestClient(app)
@@ -113,3 +114,34 @@ def test_inventory_recommendations_reject_non_csv_and_empty_inventory_uploads():
     assert wrong_extension.status_code == 415
     assert empty_inventory.status_code == 400
     assert "empty" in empty_inventory.json()["detail"].lower()
+
+
+def test_processing_api_rate_limit_returns_429_and_retry_after(monkeypatch):
+    monkeypatch.setenv("DEMANDIQ_API_RATE_LIMIT_REQUESTS", "2")
+    monkeypatch.setenv("DEMANDIQ_API_RATE_LIMIT_WINDOW_SECONDS", "60")
+    with api_module._rate_limit_lock:
+        api_module._rate_limit_buckets.clear()
+
+    first = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("empty.csv", BytesIO(b""), "text/csv")},
+    )
+    second = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("empty.csv", BytesIO(b""), "text/csv")},
+    )
+    limited = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("empty.csv", BytesIO(b""), "text/csv")},
+    )
+
+    assert first.status_code == 400
+    assert second.status_code == 400
+    assert limited.status_code == 429
+    assert int(limited.headers["retry-after"]) >= 1
+    assert "Too many processing requests" in limited.json()["detail"]
+
+    # The limit is scoped to processing endpoints, not the health check.
+    assert client.get("/api/v1/health").status_code == 200
+    with api_module._rate_limit_lock:
+        api_module._rate_limit_buckets.clear()
