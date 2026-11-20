@@ -117,11 +117,20 @@ The Store Item Demand Forecasting Challenge dataset was validated and profiled (
 
 ## Security and release boundary
 
-The FastAPI processing endpoints now include a configurable per-process per-client rate limiter (default 120 requests per 60 seconds) and return HTTP 429 with `Retry-After` when exceeded. This is defense in depth only; production must also configure hosting/edge-level distributed rate limits, request-body and execution-time limits. The API remains stateless and does not verify Supabase access tokens. Do not expose it as a public unrestricted compute service.
+The React application uses Supabase Auth. Every FastAPI processing endpoint (sales validation, forecasting, inventory template and inventory recommendations) now requires a bearer access token and validates it with the configured Supabase Auth `/auth/v1/user` endpoint. The backend uses only the Supabase project URL and publishable key for this check; never configure a service-role key for this purpose. Missing/invalid tokens are rejected, and authentication-provider outages fail closed. The API remains stateless and does not read or write workspace records.
 
-Supabase Auth protects the frontend workspace. Workspace-owned tables use RLS, and the sales source-file bucket is private with user-folder policies.
+The processing endpoints also include a configurable per-process per-client rate limiter (default 120 requests per 60 seconds; the Render blueprint proposes 30 per 60 seconds). This is defense in depth only; production must additionally configure distributed edge rate limits, total request-body limits, execution-time limits and concurrency controls. CORS is restricted through the `DEMANDIQ_CORS_ORIGINS` environment variable and is not authentication.
 
-The FastAPI forecast and inventory endpoints currently process uploaded CSVs statelessly and do not themselves verify a Supabase user token or persist user records. Before unrestricted public production exposure, Stage 6 must complete API abuse/rate-limit and deployment-access decisions. Do not interpret database RLS as authentication for the stateless API.
+Supabase Auth protects the frontend workspace. Workspace-owned tables use RLS, and the sales source-file bucket is private with user-folder policies. Keep all production secrets in the relevant hosting environment-variable dashboards; never commit them.
+
+## Cloud deployment configuration
+
+- Frontend: connect the GitHub `main` branch to Vercel with root directory `frontend`, install command `npm ci`, build command `npm run build`, and output directory `dist`. The Vercel SPA rewrite is in `frontend/vercel.json`.
+- Backend: use the root-level `render.yaml` blueprint on Render. Automatic deployment is disabled in the blueprint; configure the Supabase URL, publishable key and exact Vercel origin in the Render environment before enabling service traffic.
+- Python runtime: pinned to 3.11.11 in `.python-version`, matching the CI Python 3.11 line.
+- Supabase: continue using the existing hosted project. GitHub contains migration source files, not the live database records or Storage objects.
+
+These files prepare the hosting configuration only. No hosting service has been created or deployed by this change.
 
 ## Reproducible real-dataset evaluation
 
