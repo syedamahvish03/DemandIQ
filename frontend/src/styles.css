@@ -678,3 +678,39 @@ button:disabled{cursor:not-allowed}
   .analysis-card{padding:16px;gap:11px}
   .analysis-card-summary span{font-size:8px}
 }
+
+
+/* Unified workspace frame for forecasting, inventory, suppliers and saved analyses */
+.workspace-page-content{max-width:none;min-width:0}
+.workspace-page-content>.forecast-page{
+  min-height:calc(100vh - 140px);
+  padding:8px 0 34px;
+  background:transparent;
+}
+.workspace-page-content .forecast-container{
+  width:min(100%,1120px);
+  margin:0 auto;
+}
+.workspace-page-content .forecast-heading{margin-top:28px}
+.workspace-page-content .forecast-page-links{align-items:center}
+.workspace-page-content .forecast-card,
+.workspace-page-content .forecast-results,
+.workspace-page-content .sales-panel-card{box-shadow:var(--di-shadow-sm)}
+.workspace-page-content .forecast-table-wrap{max-width:100%;overflow-x:auto}
+.workspace-page-content .forecast-table{min-width:650px}
+.workspace-page-content .forecast-heading h1{letter-spacing:-1.7px}
+.workspace-page-content .forecast-page-links .forecast-back{color:#66739a}
+.workspace-page-content .forecast-page-links .forecast-back:hover{color:#526de0}
+@media(max-width:900px){
+  .workspace-page-content{padding:24px 22px 42px}
+  .workspace-page-content>.forecast-page{padding:0 0 25px}
+  .workspace-page-content .forecast-container{width:100%}
+}
+@media(max-width:650px){
+  .workspace-page-content{padding:18px 14px 34px}
+  .workspace-page-content>.forecast-page{min-height:auto;padding:0}
+  .workspace-page-content .forecast-heading{margin:22px 0 18px}
+  .workspace-page-content .forecast-heading h1{font-size:30px}
+  .workspace-page-content .forecast-page-links{gap:10px;flex-wrap:wrap}
+  .workspace-page-content .forecast-table-wrap{margin-right:-2px}
+}
