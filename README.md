@@ -112,6 +112,8 @@ Inventory values are supplied by the retailer; DemandIQ does not infer actual st
 
 ## Security and release boundary
 
+The FastAPI processing endpoints now include a configurable per-process per-client rate limiter (default 120 requests per 60 seconds) and return HTTP 429 with `Retry-After` when exceeded. This is defense in depth only; production must also configure hosting/edge-level distributed rate limits, request-body and execution-time limits. The API remains stateless and does not verify Supabase access tokens. Do not expose it as a public unrestricted compute service.
+
 Supabase Auth protects the frontend workspace. Workspace-owned tables use RLS, and the sales source-file bucket is private with user-folder policies.
 
 The FastAPI forecast and inventory endpoints currently process uploaded CSVs statelessly and do not themselves verify a Supabase user token or persist user records. Before unrestricted public production exposure, Stage 6 must complete API abuse/rate-limit and deployment-access decisions. Do not interpret database RLS as authentication for the stateless API.
