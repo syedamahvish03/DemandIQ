@@ -34,7 +34,7 @@ jobs:
         run: python -m pytest -q
 
       - name: Check Streamlit app syntax
-        run: python -m py_compile app.py
+        run: python -m py_compile app.py scripts/run_release_evaluation.py
 
       # React frontend
       - name: Set up Node.js
