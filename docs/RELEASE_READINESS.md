@@ -43,6 +43,7 @@ A passing CI run verifies the covered automated checks only. It does not prove S
 - [ ] Confirm no service-role key or other secret is present in frontend source, built assets, committed files or browser requests.
 
 ### C. API exposure and abuse controls
+- [x] Add configurable in-process rate limiting to CPU/memory-heavy API routes, with a 429 response and `Retry-After` header.
 - [ ] Decide how production FastAPI endpoints will be protected against anonymous resource abuse (for example, hosting-level rate limits and request-size/time limits, and/or authenticated API access).
 - [ ] Apply exact production CORS origins; never treat CORS as an authentication control.
 - [ ] Verify request-size limits and practical processing limits under concurrent or repeated requests.
