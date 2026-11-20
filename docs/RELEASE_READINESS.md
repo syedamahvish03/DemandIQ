@@ -17,7 +17,7 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 ## Verified evidence as of 20 November 2026
 
 ### Automated and local checks
-- [x] GitHub Actions runs #190, #191 and #192 completed successfully, covering the rate-limiter capacity fix, its regression tests and the release checklist update. Upload-limit and sanitized-error tests were added afterward and are awaiting CI.
+- [x] GitHub Actions runs #190–#194 completed successfully, including rate-limiter capacity hardening, upload-size coverage, sanitized API-error regression coverage and documentation corrections.
 - [x] User ran the local full Python test suite: 131 passed, with one non-blocking Starlette/httpx deprecation warning.
 - [x] User ran `python -m py_compile app.py scripts/run_release_evaluation.py` successfully.
 - [x] User ran `npm run build` successfully. Vite emitted a non-blocking warning that the JavaScript bundle exceeded 500 kB (598.06 kB; 167.69 kB gzip).
@@ -33,6 +33,15 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 - [x] User confirmed the Account A demo CSV object is present in the private bucket.
 - [ ] A direct attempt by Account B to list/download/delete Account A's exact Storage object has not been performed. Policy inspection and UI isolation checks are not a substitute for this test.
 - [ ] Direct cross-account read/update/delete attempts against every RLS table have not been individually tested. Do not describe the practical UI checks as exhaustive RLS penetration testing.
+
+### Live Supabase audit (20 November 2026)
+- [x] Connected directly to the intended Supabase project; project status reported `ACTIVE_HEALTHY`.
+- [x] Live schema inspection confirmed all six application tables have RLS enabled and the expected owner/workspace foreign-key relationships.
+- [x] Live Storage inspection confirmed `sales-imports` is private, has a 10 MB limit, and has authenticated-user INSERT/SELECT/DELETE policies scoped to the first folder segment matching `auth.uid()`.
+- [x] Under an authenticated SQL role with Account B's user ID, the visible row counts were 1 workspace and 1 product, with 0 imports, sales records, suppliers, analysis runs and private Storage objects. This is an additional read-isolation signal, not exhaustive record-ID or write-path testing.
+- [x] Added and verified migration `20261120164007_add_foreign_key_supporting_indexes` with 10 child-side indexes for the foreign-key relationships flagged by Supabase's performance advisor. A fresh advisor run no longer reports unindexed foreign keys.
+- [ ] Supabase security advisor still reports leaked-password protection disabled. Enable it in Supabase Auth password security settings before production.
+- [ ] The performance advisor now reports only unused-index INFO notices on this low-volume project. Do not remove indexes solely on this early-usage signal; reassess with representative production workload.
 
 ### Backup and recovery
 - [x] Supabase Dashboard was checked; it states that managed project backups are not included on the current Free plan.
@@ -56,8 +65,8 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 - [x] Frontend production build passes in CI and locally.
 - [x] Full local Python test suite and syntax compilation were run after pulling the feature branch.
 - [x] Core browser workflows were exercised by the user: import, catalogue, suppliers, forecast, inventory planning and saved analyses.
-- [x] Automated tests cover empty and wrong-extension uploads on the relevant endpoints, and per-file oversize requests across forecasts, sales validation, inventory template and both inventory recommendation uploads. The newest oversize tests are awaiting CI.
-- [x] Forecast unexpected-error regression test asserts that the response is generic and does not expose exception details or uploaded-row marker text. The newest test is awaiting CI; production log review remains separate.
+- [x] Automated tests cover empty and wrong-extension uploads on the relevant endpoints, and per-file oversize requests across forecasts, sales validation, inventory template and both inventory recommendation uploads.
+- [x] Forecast unexpected-error regression test asserts that the response is generic and does not expose exception details or uploaded-row marker text. Production log review remains separate.
 - [ ] Run browser workflows on a local production preview, not only the development server, and capture any remaining edge cases.
 
 ### B. Supabase and storage isolation
@@ -70,7 +79,7 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 
 ### C. API exposure and abuse controls
 - [x] Configurable in-process per-client rate limiting implemented (default 120 requests / 60 seconds; 429 plus `Retry-After`).
-- [x] Rate-limit client storage is capped at 5,000 entries; expired entries are pruned and active limits are never cleared to make room. Regression tests cover full and expired buckets (new tests await CI).
+- [x] Rate-limit client storage is capped at 5,000 entries; expired entries are pruned and active limits are never cleared to make room. Regression tests cover full and expired buckets.
 - [x] API trust boundary documented: stateless endpoints do not access workspace records and do not validate Supabase access tokens.
 - [x] Per-file upload reads are bounded at 10 MB.
 - [ ] Before public deployment, choose and configure the API access strategy: authenticated API access or an explicitly accepted public compute endpoint protected by strong edge/hosting controls.
