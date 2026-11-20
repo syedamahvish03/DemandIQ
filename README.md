@@ -165,4 +165,4 @@ GitHub Actions runs Python tests, the Streamlit syntax check and the frontend pr
 
 ## Documentation
 
-See `docs/PRODUCT_ARCHITECTURE.md` for the roadmap, `docs/RELEASE_READINESS.md` for the Stage 6 verification checklist and `backend/README.md` for API endpoint details.
+See `docs/PRODUCT_ARCHITECTURE.md` for the roadmap, `docs/RELEASE_READINESS.md` for the Stage 6 verification checklist, `docs/DEPLOYMENT.md` for the Vercel/Render/Supabase deployment handoff, and `backend/README.md` for API endpoint details.
