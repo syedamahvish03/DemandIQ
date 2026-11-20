@@ -118,6 +118,18 @@ Supabase Auth protects the frontend workspace. Workspace-owned tables use RLS, a
 
 The FastAPI forecast and inventory endpoints currently process uploaded CSVs statelessly and do not themselves verify a Supabase user token or persist user records. Before unrestricted public production exposure, Stage 6 must complete API abuse/rate-limit and deployment-access decisions. Do not interpret database RLS as authentication for the stateless API.
 
+## Reproducible real-dataset evaluation
+
+The Stage 6 evaluation runner accepts a real daily sales CSV with `date,store,item,sales` columns. It validates daily series continuity and duplicate keys, then exports recursive 7/15/30-day comparisons and rolling-origin results for Random Forest, seasonal-naive and moving-average baselines.
+
+After obtaining the licensed Store Item Demand Forecasting Challenge training CSV (or another suitable dataset), run from the repository root:
+
+```powershell
+python scripts/run_release_evaluation.py --input path\\to\\train.csv
+```
+
+Outputs are written to `results/release_evaluation/` and are intentionally not committed with raw customer/dataset data. The script records dataset coverage, preprocessing checks, evaluation metadata and caveats. Actual measured results still need to be generated and reviewed before claiming model performance.
+
 ## Tests
 
 From the repository root:
