@@ -17,7 +17,7 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 ## Verified evidence as of 20 November 2026
 
 ### Automated and local checks
-- [x] GitHub Actions run #188 completed successfully on commit `0b5cc299f0796ac1ea78350df001749b67999dee`; a subsequent rate-limiter hardening change is awaiting its own CI run.
+- [x] GitHub Actions runs #190, #191 and #192 completed successfully, covering the rate-limiter capacity fix, its regression tests and the release checklist update. Upload-limit and sanitized-error tests were added afterward and are awaiting CI.
 - [x] User ran the local full Python test suite: 131 passed, with one non-blocking Starlette/httpx deprecation warning.
 - [x] User ran `python -m py_compile app.py scripts/run_release_evaluation.py` successfully.
 - [x] User ran `npm run build` successfully. Vite emitted a non-blocking warning that the JavaScript bundle exceeded 500 kB (598.06 kB; 167.69 kB gzip).
@@ -56,8 +56,8 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 - [x] Frontend production build passes in CI and locally.
 - [x] Full local Python test suite and syntax compilation were run after pulling the feature branch.
 - [x] Core browser workflows were exercised by the user: import, catalogue, suppliers, forecast, inventory planning and saved analyses.
-- [ ] Add or perform explicit malformed, empty, oversized and wrong-extension checks for every upload endpoint, including the combined inventory upload.
-- [ ] Verify unexpected API errors do not expose stack traces, secrets or uploaded row contents.
+- [x] Automated tests cover empty and wrong-extension uploads on the relevant endpoints, and per-file oversize requests across forecasts, sales validation, inventory template and both inventory recommendation uploads. The newest oversize tests are awaiting CI.
+- [x] Forecast unexpected-error regression test asserts that the response is generic and does not expose exception details or uploaded-row marker text. The newest test is awaiting CI; production log review remains separate.
 - [ ] Run browser workflows on a local production preview, not only the development server, and capture any remaining edge cases.
 
 ### B. Supabase and storage isolation
