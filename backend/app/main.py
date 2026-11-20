@@ -87,7 +87,24 @@ async def limit_processing_requests(request: Request, call_next):
         now = time.monotonic()
         limit, window = _rate_limit_settings()
         with _rate_limit_lock:
-            started_at, count = _rate_limit_buckets.get(client_host, (now, 0))
+            bucket = _rate_limit_buckets.get(client_host)
+            if bucket is None and len(_rate_limit_buckets) >= 5000:
+                # Remove only expired clients; never clear active limits to make room.
+                expired_clients = [
+                    host
+                    for host, (started_at, _) in _rate_limit_buckets.items()
+                    if now - started_at >= window
+                ]
+                for host in expired_clients:
+                    del _rate_limit_buckets[host]
+                if len(_rate_limit_buckets) >= 5000:
+                    return JSONResponse(
+                        status_code=429,
+                        content={"detail": "Processing capacity is temporarily limited. Please retry shortly."},
+                        headers={"Retry-After": str(window)},
+                    )
+
+            started_at, count = bucket if bucket is not None else (now, 0)
             if now - started_at >= window:
                 started_at, count = now, 0
             if count >= limit:
@@ -98,9 +115,6 @@ async def limit_processing_requests(request: Request, call_next):
                     headers={"Retry-After": str(retry_after)},
                 )
             _rate_limit_buckets[client_host] = (started_at, count + 1)
-            if len(_rate_limit_buckets) > 5000:
-                _rate_limit_buckets.clear()
-                _rate_limit_buckets[client_host] = (started_at, count + 1)
     return await call_next(request)
 
 
