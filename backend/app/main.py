@@ -101,11 +101,17 @@ async def get_current_user(
             detail="Authentication service is temporarily unavailable.",
         ) from None
 
-    if response.status_code != 200:
+    if response.status_code in (400, 401, 403):
         raise HTTPException(
             status_code=401,
             detail="The authentication token is invalid or has expired.",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    if response.status_code != 200:
+        logger.warning("Supabase Auth returned HTTP %s during token validation.", response.status_code)
+        raise HTTPException(
+            status_code=503,
+            detail="Authentication service is temporarily unavailable.",
         )
 
     try:
