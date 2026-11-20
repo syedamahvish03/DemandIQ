@@ -192,3 +192,74 @@ def test_rate_limiter_prunes_expired_clients_before_rejecting_new_client(monkeyp
         assert len(api_module._rate_limit_buckets) == 1
         assert "testclient" in api_module._rate_limit_buckets
         api_module._rate_limit_buckets.clear()
+
+
+def test_all_upload_endpoints_enforce_per_file_size_limit(monkeypatch):
+    monkeypatch.setattr(api_module, "MAX_UPLOAD_BYTES", 8)
+    oversized = b"123456789"
+
+    forecast = client.post(
+        "/api/v1/forecasts",
+        files={"file": ("sales.csv", oversized, "text/csv")},
+        data={"horizon_days": "7"},
+    )
+    sales_validation = client.post(
+        "/api/v1/sales/validate",
+        files={"file": ("sales.csv", oversized, "text/csv")},
+    )
+    inventory_template = client.post(
+        "/api/v1/inventory/template",
+        files={"sales_file": ("sales.csv", oversized, "text/csv")},
+    )
+    inventory_sales_oversized = client.post(
+        "/api/v1/inventory/recommendations",
+        files={
+            "sales_file": ("sales.csv", oversized, "text/csv"),
+            "inventory_file": ("inventory.csv", b"x", "text/csv"),
+        },
+    )
+    inventory_stock_oversized = client.post(
+        "/api/v1/inventory/recommendations",
+        files={
+            "sales_file": ("sales.csv", b"x", "text/csv"),
+            "inventory_file": ("inventory.csv", oversized, "text/csv"),
+        },
+    )
+
+    assert [
+        forecast.status_code,
+        sales_validation.status_code,
+        inventory_template.status_code,
+        inventory_sales_oversized.status_code,
+        inventory_stock_oversized.status_code,
+    ] == [413, 413, 413, 413, 413]
+
+
+def test_forecast_unexpected_error_returns_generic_message_without_exception_details(monkeypatch):
+    import pandas as pd
+
+    dates = pd.date_range("2025-01-01", periods=35, freq="D")
+    frame = pd.DataFrame({
+        "date": dates.strftime("%Y-%m-%d"),
+        "store": ["STORE_A"] * 35,
+        "item": ["SKU_100"] * 35,
+        "sales": [10 + (index % 4) for index in range(35)],
+    })
+    monkeypatch.setattr(
+        api_module,
+        "forecast_future_demand",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("private-row-secret")),
+    )
+
+    response = client.post(
+        "/api/v1/forecasts",
+        files={"file": ("sales.csv", frame.to_csv(index=False).encode("utf-8"), "text/csv")},
+        data={"horizon_days": "7"},
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == (
+        "The forecast could not be generated due to an internal processing error."
+    )
+    assert "private-row-secret" not in response.text
+    assert "Traceback" not in response.text
