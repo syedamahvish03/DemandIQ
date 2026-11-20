@@ -17,7 +17,7 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 ## Verified evidence as of 20 November 2026
 
 ### Automated and local checks
-- [x] Latest observed GitHub Actions run #187 completed successfully on commit `647792fd79c12d67fb9e0806fa25b1bfab80180c`.
+- [x] GitHub Actions run #188 completed successfully on commit `0b5cc299f0796ac1ea78350df001749b67999dee`; a subsequent rate-limiter hardening change is awaiting its own CI run.
 - [x] User ran the local full Python test suite: 131 passed, with one non-blocking Starlette/httpx deprecation warning.
 - [x] User ran `python -m py_compile app.py scripts/run_release_evaluation.py` successfully.
 - [x] User ran `npm run build` successfully. Vite emitted a non-blocking warning that the JavaScript bundle exceeded 500 kB (598.06 kB; 167.69 kB gzip).
@@ -69,7 +69,8 @@ This document tracks verification for the React + FastAPI product on `feature/pr
 - [ ] Verify actual local environment files, built assets and browser requests contain no service-role key or other secret. The tracked-file scan only verified the committed example configuration, not every local or deployed secret source.
 
 ### C. API exposure and abuse controls
-- [x] Configurable in-process per-client rate limiting implemented and regression-tested (default 120 requests / 60 seconds; 429 plus `Retry-After`).
+- [x] Configurable in-process per-client rate limiting implemented (default 120 requests / 60 seconds; 429 plus `Retry-After`).
+- [x] Rate-limit client storage is capped at 5,000 entries; expired entries are pruned and active limits are never cleared to make room. Regression tests cover full and expired buckets (new tests await CI).
 - [x] API trust boundary documented: stateless endpoints do not access workspace records and do not validate Supabase access tokens.
 - [x] Per-file upload reads are bounded at 10 MB.
 - [ ] Before public deployment, choose and configure the API access strategy: authenticated API access or an explicitly accepted public compute endpoint protected by strong edge/hosting controls.
