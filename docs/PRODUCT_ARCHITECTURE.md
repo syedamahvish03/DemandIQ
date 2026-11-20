@@ -1,5 +1,7 @@
 # DemandIQ Product Architecture
 
+> **Implementation status (Stage 6 review, 20 November 2026):** This document records both the product direction and the current release boundary. The delivered MVP uses Supabase Auth with one personal workspace per account; workspace team membership and roles, store management, guided onboarding, password recovery and native mobile apps are not implemented. The frontend uses custom CSS rather than Tailwind. Sales imports retain original CSVs in a private Supabase Storage bucket. The supplier directory is a reference list and is not automatically connected to inventory inputs or purchase orders. The FastAPI processing endpoints are stateless and currently do not validate Supabase access tokens or apply application-level rate limits. The PWA supports installation and a limited navigation fallback, not offline forecasting. See [the Stage 6 release-readiness checklist](RELEASE_READINESS.md) and the root README for the verified current state.
+
 ## 1. Product vision
 
 DemandIQ is a multi-user retail demand forecasting and inventory intelligence web application. It helps an individual retailer or retail team understand product performance, explore historical sales, estimate future demand, and make evidence-based replenishment decisions.
