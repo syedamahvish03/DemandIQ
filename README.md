@@ -6,7 +6,7 @@ DemandIQ is a retail-planning application that combines historical sales analysi
 
 ## Product status
 
-The React + FastAPI product is implemented on the `feature/product-architecture` branch. Stage 0–5 implementation is complete. Stage 6 hardening and release readiness is in progress. Production deployment and live verification are a separate final phase.
+The React + FastAPI product is implemented on `feature/product-architecture` and is ready for cloud deployment preparation. Stages 0–6 implementation and automated verification are complete. Public production launch still requires hosting-specific API access controls, abuse protection, a verified backup/restore plan and live deployment checks.
 
 The original Streamlit application remains in the repository as the reference MVP.
 
@@ -76,6 +76,7 @@ Apply the migrations in order to the intended Supabase project:
 1. `20261119000100_create_user_workspaces.sql`
 2. `20261119000200_create_sales_import_foundation.sql`
 3. `20261119000300_create_workspace_suppliers.sql`
+4. `20261120164007_add_foreign_key_supporting_indexes.sql`
 
 Do not re-run migrations that are already applied unless the migration process explicitly requires it. Keep project secrets out of Git.
 
@@ -109,6 +110,10 @@ Inventory values are supplied by the retailer; DemandIQ does not infer actual st
 - Promotions, price changes, holidays, stockouts and future external events are not automatically modelled unless represented in the input features.
 - Empirical error summaries are not formal prediction intervals.
 - Inventory calculations are decision-support estimates, not purchase orders or guarantees against stockouts.
+
+## Evaluation evidence
+
+The Store Item Demand Forecasting Challenge dataset was validated and profiled (913,000 rows, 500 store-item series, 2013–2017). On a recursive 30-day holdout, Random Forest pooled WAPE was 16.70% (7 days), 15.89% (15 days) and 15.07% (30 days). Across three rolling origins, pooled WAPE was 12.70%, 13.03% and 14.32% for the same horizons. Each evaluation run used a 200,000-row training subset; rolling-origin holdouts overlap, and three origins are limited evidence. These are offline benchmark results, not a production accuracy guarantee or automatic per-series model selection. Full methodology and limitations are in `docs/RELEASE_READINESS.md`.
 
 ## Security and release boundary
 
