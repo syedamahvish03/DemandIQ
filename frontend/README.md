@@ -46,5 +46,5 @@ The production build is served by Vite preview (normally http://localhost:4173).
 - Supabase Row Level Security protects workspace data. Do not bypass RLS or expose service-role credentials in the browser.
 - Sales source CSVs are stored in the private `sales-imports` bucket.
 - The supplier directory is reference information only; it does not automatically fill inventory inputs or create purchase orders.
-- The FastAPI processing API is stateless and currently does not validate Supabase access tokens. It has a per-process rate limit; production hosting must additionally enforce distributed rate limits and request/time limits.
+- The FastAPI processing API requires the current Supabase session access token on every sales-validation, forecasting and inventory-processing request. The frontend attaches the bearer token from the Supabase session; the backend validates it with Supabase Auth. The public health endpoint does not require a session. Production hosting must additionally enforce distributed rate limits and request/time limits.
 - Store management and multi-user workspace membership are not implemented in this MVP.
