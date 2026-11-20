@@ -2,7 +2,7 @@ name: DemandIQ tests
 
 on:
   push:
-    branches: [main, feature/product-architecture]
+    branches: [main, feature/product-architecture, deployment/**]
   pull_request:
     branches: [main]
 
