@@ -96,7 +96,7 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <div className="workspace-data-note"><ShieldCheck size={17}/><span><b>Your analysis results are saved to your private workspace.</b> Forecast outputs and inventory recommendations are stored in Supabase and available when you sign in again. Original uploaded CSV files are not stored.</span></div>
+          <div className="workspace-data-note"><ShieldCheck size={17}/><span><b>Your analysis results are saved to your private workspace.</b> Forecast outputs and inventory recommendations are stored in Supabase and available when you sign in again. Original sales CSV files are retained in private workspace storage with user-scoped access controls.</span></div>
         </div>
       </section>
     </main>
