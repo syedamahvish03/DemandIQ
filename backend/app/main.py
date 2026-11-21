@@ -215,8 +215,22 @@ async def limit_processing_requests(request: Request, call_next):
                     status_code=413,
                     content={"detail": "The total upload request exceeds the 21 MB request limit."},
                 )
-        # Re-expose the bounded body to FastAPI's multipart parser.
-        request._body = bytes(received_body)
+        # Replay the bounded body to FastAPI's downstream multipart parser.
+        bounded_body = bytes(received_body)
+        body_sent = False
+
+        async def replay_bounded_body():
+            nonlocal body_sent
+            if body_sent:
+                return {"type": "http.disconnect"}
+            body_sent = True
+            return {
+                "type": "http.request",
+                "body": bounded_body,
+                "more_body": False,
+            }
+
+        request._receive = replay_bounded_body
 
     return await call_next(request)
 
