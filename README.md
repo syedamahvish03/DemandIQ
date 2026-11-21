@@ -6,7 +6,7 @@ DemandIQ is a retail-planning application that combines historical sales analysi
 
 ## Product status
 
-The React + FastAPI product is implemented on `feature/product-architecture` and is ready for cloud deployment preparation. Stages 0–6 implementation and automated verification are complete. Public production launch still requires hosting-specific API access controls, abuse protection, a verified backup/restore plan and live deployment checks.
+The React + FastAPI product is implemented and committed on the repository's `main` branch. The application source and Vercel/Render deployment configuration are present in GitHub and ready to be connected to the hosting providers. Stages 0–6 implementation and automated verification are complete. Hosting connection, production environment configuration and deployment are still separate steps. A public production launch also requires hosting-specific API access controls, abuse protection, a verified backup/restore plan and live deployment checks.
 
 The original Streamlit application remains in the repository as the reference MVP.
 
@@ -106,7 +106,7 @@ Inventory values are supplied by the retailer; DemandIQ does not infer actual st
 - Forecasting uses lagged sales, rolling means and calendar features.
 - Production forecasts are recursive multi-step forecasts; one-step evaluation is not presented as equivalent to recursive forecast performance.
 - The research workflow compares Random Forest with seasonal-naive and moving-average baselines using chronological and rolling-origin evaluation.
-- No accuracy or business-impact percentage should be claimed without a documented real-dataset evaluation.
+- Report accuracy figures only with their dataset, forecast horizon, evaluation design, training-sample limits and caveats. The benchmark results documented below are offline measurements, not guarantees of future or production performance.
 - Promotions, price changes, holidays, stockouts and future external events are not automatically modelled unless represented in the input features.
 - Empirical error summaries are not formal prediction intervals.
 - Inventory calculations are decision-support estimates, not purchase orders or guarantees against stockouts.
@@ -130,7 +130,7 @@ Supabase Auth protects the frontend workspace. Workspace-owned tables use RLS, a
 - Python runtime: pinned to 3.11.11 in `.python-version`, matching the CI Python 3.11 line.
 - Supabase: continue using the existing hosted project. GitHub contains migration source files, not the live database records or Storage objects.
 
-These files prepare the hosting configuration only. No hosting service has been created or deployed by this change.
+The repository contains the hosting configuration, but the Vercel and Render services have not yet been connected, configured or deployed. Complete the provider connection and environment-variable setup as described in `docs/DEPLOYMENT.md` before deployment. No Supabase migration needs to be reapplied merely to connect the hosting providers.
 
 ## Reproducible real-dataset evaluation
 
@@ -139,10 +139,10 @@ The Stage 6 evaluation runner accepts a real daily sales CSV with `date,store,it
 After obtaining the licensed Store Item Demand Forecasting Challenge training CSV (or another suitable dataset), run from the repository root:
 
 ```powershell
-python scripts/run_release_evaluation.py --input path\\to\\train.csv
+python scripts/run_release_evaluation.py --input path\to\train.csv
 ```
 
-Outputs are written to `results/release_evaluation/` and are intentionally not committed with raw customer/dataset data. The script records dataset coverage, preprocessing checks, evaluation metadata and caveats. Actual measured results still need to be generated and reviewed before claiming model performance.
+Outputs are written to `results/release_evaluation/` and are intentionally not committed with raw customer/dataset data. The script records dataset coverage, preprocessing checks, evaluation metadata and caveats. The benchmark figures in the Evaluation evidence section summarize a recorded run. For a new dataset or updated evaluation, run the script again and review its generated metrics and limitations before reporting the results.
 
 ## Tests
 
