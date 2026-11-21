@@ -3,6 +3,12 @@ import logging
 import os
 import threading
 import time
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load backend-local settings for development; hosted environments use platform env vars.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 from io import BytesIO
 
 from fastapi.responses import Response
