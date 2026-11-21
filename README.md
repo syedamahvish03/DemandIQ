@@ -6,7 +6,7 @@ DemandIQ is a retail-planning application that combines historical sales analysi
 
 ## Product status
 
-The React + FastAPI product is implemented and committed on the repository's `main` branch. The application source and Vercel/Render deployment configuration are present in GitHub and ready to be connected to the hosting providers. Stages 0–6 implementation and automated verification are complete. Hosting connection, production environment configuration and deployment are still separate steps. A public production launch also requires hosting-specific API access controls, abuse protection, a verified backup/restore plan and live deployment checks.
+The React + FastAPI product is implemented and committed on the repository's `main` branch. The application source and Render-only deployment configuration are being prepared on a dedicated deployment branch. The approved initial hosting target is a Render static frontend and Render Free FastAPI backend, with the existing Supabase Free project retained for Auth, PostgreSQL, RLS and private Storage. Stages 0–6 implementation and automated verification are complete. Hosting connection, production environment configuration and deployment are still separate steps. A public production launch also requires hosting-specific API access controls, abuse protection, a verified backup/restore plan and live deployment checks.
 
 The original Streamlit application remains in the repository as the reference MVP.
 
@@ -125,12 +125,13 @@ Supabase Auth protects the frontend workspace. Workspace-owned tables use RLS, a
 
 ## Cloud deployment configuration
 
-- Frontend: connect the GitHub `main` branch to Vercel with root directory `frontend`, install command `npm ci`, build command `npm run build`, and output directory `dist`. The Vercel SPA rewrite is in `frontend/vercel.json`.
-- Backend: use the root-level `render.yaml` blueprint on Render. Automatic deployment is disabled in the blueprint; configure the Supabase URL, publishable key and exact Vercel origin in the Render environment before enabling service traffic.
+- Frontend: Render Static Site from `frontend/`, using `npm ci && npm run build`, publishing `dist`, with a React Router SPA rewrite to `/index.html`.
+- Backend: Render Free Web Service using the existing FastAPI application and the root-level `render.yaml` Blueprint.
+- Both Render services have automatic deployment disabled in the Blueprint.
 - Python runtime: pinned to 3.11.11 in `.python-version`, matching the CI Python 3.11 line.
-- Supabase: continue using the existing hosted project. GitHub contains migration source files, not the live database records or Storage objects.
+- Supabase: continue using the existing hosted project for Auth, PostgreSQL, RLS and private Storage. GitHub contains migration source files, not live database records or Storage objects.
 
-The repository contains the hosting configuration, but the Vercel and Render services have not yet been connected, configured or deployed. Complete the provider connection and environment-variable setup as described in `docs/DEPLOYMENT.md` before deployment. No Supabase migration needs to be reapplied merely to connect the hosting providers.
+The approved initial target is Render + Supabase Free, subject to each provider's quotas and free-tier limitations. Render's free backend sleeps after 15 minutes without inbound traffic and can take about a minute to wake. This is suitable for initial deployment testing and demonstrations, not guaranteed always-on production availability. The Render services have not been created or deployed, environment variables have not been entered, and Supabase settings have not been changed. Follow `docs/DEPLOYMENT.md`; obtain separate approval before creating/deploying services or changing Supabase production settings.
 
 ## Reproducible real-dataset evaluation
 
@@ -165,4 +166,4 @@ GitHub Actions runs Python tests, the Streamlit syntax check and the frontend pr
 
 ## Documentation
 
-See `docs/PRODUCT_ARCHITECTURE.md` for the roadmap, `docs/RELEASE_READINESS.md` for the Stage 6 verification checklist, `docs/DEPLOYMENT.md` for the Vercel/Render/Supabase deployment handoff, and `backend/README.md` for API endpoint details.
+See `docs/PRODUCT_ARCHITECTURE.md` for the roadmap, `docs/RELEASE_READINESS.md` for the Stage 6 verification checklist, `docs/DEPLOYMENT.md` for the Render/Supabase deployment handoff, and `backend/README.md` for API endpoint details.
