@@ -302,3 +302,75 @@ def test_sales_validation_endpoint_can_return_all_clean_rows_for_import():
         "item": 101,
         "sales": 20,
     }
+
+
+
+def test_forecast_uses_one_shared_cutoff_and_reports_incomplete_series():
+    latest_series = pd.read_csv(BytesIO(make_sales_csv(days=50)))
+    stale_dates = pd.date_range("2025-01-01", periods=35, freq="D")
+    stale_series = pd.DataFrame({
+        "date": stale_dates.strftime("%Y-%m-%d"),
+        "store": [2] * len(stale_dates),
+        "item": [202] * len(stale_dates),
+        "sales": [12 + (index % 5) for index in range(len(stale_dates))],
+    })
+    mixed = pd.concat([latest_series, stale_series], ignore_index=True)
+
+    response = client.post(
+        "/api/v1/forecasts",
+        files={"file": ("mixed_history.csv", BytesIO(mixed.to_csv(index=False).encode("utf-8")), "text/csv")},
+        data={"horizon_days": "7"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    metadata = payload["metadata"]
+    forecast = payload["forecast"]
+    assert metadata["series_count"] == 1
+    assert metadata["total_series_count"] == 2
+    assert metadata["excluded_series_count"] == 1
+    assert metadata["history_end"] == "2025-02-19"
+    assert metadata["forecast_start"] == "2025-02-20"
+    assert metadata["forecast_end"] == "2025-02-26"
+    assert len(forecast) == 7
+    assert {row["date"] for row in forecast} == {
+        f"2025-02-{day}" for day in range(20, 27)
+    }
+    assert {(row["store"], row["item"]) for row in forecast} == {(1, 101)}
+    assert metadata["excluded_series"][0]["last_date"] == "2025-02-04"
+
+
+def test_inventory_skips_stock_rows_without_shared_cutoff_forecasts():
+    latest_series = pd.read_csv(BytesIO(make_sales_csv(days=50)))
+    stale_dates = pd.date_range("2025-01-01", periods=45, freq="D")
+    stale_series = pd.DataFrame({
+        "date": stale_dates.strftime("%Y-%m-%d"),
+        "store": [2] * len(stale_dates),
+        "item": [202] * len(stale_dates),
+        "sales": [12 + (index % 5) for index in range(len(stale_dates))],
+    })
+    mixed = pd.concat([latest_series, stale_series], ignore_index=True)
+    inventory = pd.DataFrame([
+        {"store": 1, "item": 101, "on_hand": 50, "on_order": 0, "backorders": 0,
+         "lead_time_days": 3, "review_period_days": 7},
+        {"store": 2, "item": 202, "on_hand": 40, "on_order": 0, "backorders": 0,
+         "lead_time_days": 3, "review_period_days": 7},
+    ])
+
+    response = client.post(
+        "/api/v1/inventory/recommendations",
+        files={
+            "sales_file": ("mixed_history.csv", BytesIO(mixed.to_csv(index=False).encode("utf-8")), "text/csv"),
+            "inventory_file": ("inventory.csv", BytesIO(inventory.to_csv(index=False).encode("utf-8")), "text/csv"),
+        },
+        data={"forecast_horizon_days": "15"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload["recommendations"]) == 1
+    assert (payload["recommendations"][0]["store"], payload["recommendations"][0]["item"]) == (1, 101)
+    assert payload["metadata"]["excluded_forecast_rows"] == 1
+    assert payload["metadata"]["forecast_excluded_series_count"] == 1
+    assert payload["metadata"]["forecast_start"] == "2025-02-20"
+    assert payload["metadata"]["forecast_end"] == "2025-03-06"
