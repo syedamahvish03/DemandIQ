@@ -33,6 +33,8 @@ DEFAULT_ALLOWED_ORIGINS = (
     "http://127.0.0.1:4173",
 )
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+# Includes both maximum-size inventory CSVs plus multipart/form overhead.
+MAX_REQUEST_BODY_BYTES = 21 * 1024 * 1024
 ALLOWED_HORIZONS = (7, 15, 30)
 
 
@@ -189,6 +191,35 @@ async def limit_processing_requests(request: Request, call_next):
                     headers={"Retry-After": str(retry_after)},
                 )
             _rate_limit_buckets[client_host] = (started_at, count + 1)
+
+        # Bound the complete multipart request, not only each individual CSV.
+        # The 21 MiB cap leaves 1 MiB for multipart boundaries and form fields
+        # while allowing two CSV files at the existing 10 MiB per-file limit.
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                declared_length = int(content_length)
+            except ValueError:
+                declared_length = None
+            if declared_length is not None and declared_length > MAX_REQUEST_BODY_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "The total upload request exceeds the 21 MB request limit."},
+                )
+
+        received_body = bytearray()
+        async for chunk in request.stream():
+            received_body.extend(chunk)
+            if len(received_body) > MAX_REQUEST_BODY_BYTES:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "The total upload request exceeds the 21 MB request limit."},
+                )
+        # Cache the bounded body so Starlette's downstream request stream
+        # and FastAPI's multipart parser can read it without consuming the
+        # original ASGI receive channel twice.
+        request._body = bytes(received_body)
+
     return await call_next(request)
 
 
