@@ -162,6 +162,12 @@ export default function InventoryPage() {
             <div><small>FORECAST HORIZON</small><strong>{result.metadata.forecast_horizon_days} days</strong></div>
             <div><small>DEMAND BASIS</small><strong>ML forecast</strong></div>
           </div>
+          {(result.metadata.excluded_forecast_rows ?? 0) > 0 && (
+            <div className="forecast-quality" role="status">
+              <b>Forecast coverage notice</b>
+              <span>{result.metadata.excluded_forecast_rows} completed inventory row(s) were not recommended because their sales series did not reach the shared history cutoff. Recommendations below use only products with an eligible forecast.</span>
+            </div>
+          )}
           <section className="inventory-insights" aria-label="Inventory decision insights">
             <div className="inventory-insights-heading"><div><span className="forecast-eyebrow">DECISION SUPPORT</span><h3>What needs your attention?</h3><p>Alerts are generated from the stock and forecast values in this plan.</p></div>
               <span className={result.recommendations.some(row => row.reorder_required) ? "inventory-alert-count has-alerts" : "inventory-alert-count"}>{result.recommendations.filter(row => row.reorder_required).length} reorder alerts</span>
