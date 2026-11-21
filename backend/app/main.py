@@ -438,6 +438,9 @@ async def create_inventory_recommendations(
             "forecast_rows": forecast_metadata["forecast_rows"],
             "forecast_start": forecast_metadata["forecast_start"].isoformat(),
             "forecast_end": forecast_metadata["forecast_end"].isoformat(),
+            "forecast_total_series_count": forecast_metadata["total_series_count"],
+            "forecast_excluded_series_count": forecast_metadata["excluded_series_count"],
+            "forecast_excluded_series": forecast_metadata["excluded_series"],
         })
 
     return {
