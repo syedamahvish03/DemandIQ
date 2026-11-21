@@ -8,7 +8,7 @@ This document tracks verification for the React + FastAPI product. Stage 6 imple
 - Each account receives one personal workspace. Workspace membership, team roles and multi-workspace administration are not implemented in this MVP.
 - RLS is enabled on `workspaces`, `analysis_runs`, `products`, `sales_imports`, `sales_records` and `suppliers`.
 - The `sales-imports` Storage bucket is private. Source CSV objects are stored under a user/workspace/import path and Storage policies restrict access by the first user-ID path segment.
-- FastAPI forecast, sales-validation and inventory endpoints are stateless. They do not read/write Supabase data and do not validate Supabase access tokens. The four processing endpoints have a configurable in-process per-client rate limiter (default 120 requests per 60 seconds). This is not distributed protection or API authentication. CORS is not authentication.
+- FastAPI forecast, sales-validation and inventory endpoints remain stateless and do not read/write Supabase data. All four processing endpoints now require a bearer access token and validate it against Supabase Auth `/auth/v1/user`; missing/invalid tokens fail closed. The frontend attaches the current Supabase session token. The endpoints retain a configurable in-process per-client rate limiter (default 120 requests per 60 seconds). This is not distributed protection. CORS is not authentication.
 - Upload handlers enforce a 10 MB per-file read limit. Production infrastructure must also limit total multipart request bodies and resource consumption.
 - The PWA has a manifest, install prompt and conservative navigation fallback. Forecasting and inventory operations require network/API access; full offline operation is not supported.
 - Supplier records are a reference directory. They do not automatically populate inventory input CSVs or create purchase orders.
@@ -85,11 +85,15 @@ This document tracks verification for the React + FastAPI product. Stage 6 imple
 - [ ] Verify actual local environment files, built assets and browser requests contain no service-role key or other secret. The tracked-file scan only verified the committed example configuration, not every local or deployed secret source.
 
 ### C. API exposure and abuse controls
+
+- [x] Frontend processing requests attach the current Supabase session access token; the public health endpoint remains unauthenticated.
+- [x] Hosting configuration added on a separate preparation branch: Vercel SPA rewrite, Render Blueprint with automatic deploy disabled, and Python 3.11.11 runtime pin.
+- [ ] Verify the configured production Supabase project URL/publishable key and exact deployed frontend origin in Render environment variables before starting the service.
 - [x] Configurable in-process per-client rate limiting implemented (default 120 requests / 60 seconds; 429 plus `Retry-After`).
 - [x] Rate-limit client storage is capped at 5,000 entries; expired entries are pruned and active limits are never cleared to make room. Regression tests cover full and expired buckets.
-- [x] API trust boundary documented: stateless endpoints do not access workspace records and do not validate Supabase access tokens.
+- [x] API trust boundary implemented and documented: stateless processing endpoints validate Supabase bearer tokens but do not access workspace records.
 - [x] Per-file upload reads are bounded at 10 MB.
-- [ ] Before public deployment, choose and configure the API access strategy: authenticated API access or an explicitly accepted public compute endpoint protected by strong edge/hosting controls.
+- [x] Chosen API access strategy: require Supabase-authenticated bearer tokens for all processing endpoints; automated tests cover missing, invalid, valid and unconfigured authentication states.
 - [ ] Configure and verify distributed edge/hosting rate limits, total request-body limits (including multipart overhead), execution timeouts, concurrency limits and appropriate worker sizing.
 - [ ] Apply exact production CORS origins.
 - [ ] Verify request-size and processing limits under concurrent/repeated requests.

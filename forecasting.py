@@ -365,6 +365,8 @@ def forecast_future_demand(
         raise ValueError("At least 15 daily observations per store-item series are required.")
 
     histories = {}
+    excluded_series = []
+    history_end = frame["date"].max()
     for (store, item), group in frame.groupby(["store", "item"], sort=False):
         group = group.sort_values("date")
         dates = group["date"].reset_index(drop=True)
@@ -377,10 +379,31 @@ def forecast_future_demand(
                 f"Store {store}, item {item} has missing or irregular dates. "
                 "Provide a complete daily series before forecasting."
             )
+        last_date = dates.iloc[-1]
+        if last_date != history_end:
+            excluded_series.append({
+                "store": store,
+                "item": item,
+                "last_date": last_date.date(),
+                "reason": "series_does_not_reach_latest_history_date",
+            })
+            continue
         histories[(store, item)] = {
             "sales": group["sales"].astype(float).tolist(),
-            "last_date": dates.iloc[-1],
+            "last_date": history_end,
         }
+
+    if not histories:
+        raise ValueError(
+            "No store-item series has observations through the latest date in the sales history."
+        )
+
+    # Train only on series eligible for the same forecast cutoff. This prevents
+    # stale series from contributing older calendar regimes to the current model.
+    forecast_keys = pd.DataFrame(list(histories.keys()), columns=["store", "item"])
+    eligible = eligible.merge(forecast_keys, on=["store", "item"], how="inner")
+    if eligible.empty:
+        raise ValueError("No eligible training rows are available for the selected forecast series.")
 
     train = eligible
     if len(train) > max_train_rows:
@@ -438,11 +461,14 @@ def forecast_future_demand(
     metadata = {
         "horizon_days": int(horizon_days),
         "series_count": int(len(histories)),
+        "total_series_count": int(len(histories) + len(excluded_series)),
+        "excluded_series_count": int(len(excluded_series)),
+        "excluded_series": excluded_series,
         "forecast_rows": int(len(forecast)),
         "training_rows_used": int(len(train)),
-        "history_end": frame["date"].max().date(),
-        "forecast_start": forecast["date"].min().date(),
-        "forecast_end": forecast["date"].max().date(),
+        "history_end": history_end.date(),
+        "forecast_start": (history_end + pd.Timedelta(days=1)).date(),
+        "forecast_end": (history_end + pd.Timedelta(days=horizon_days)).date(),
     }
     return forecast, metadata
 

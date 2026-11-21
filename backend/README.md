@@ -49,9 +49,17 @@ Set `DEMANDIQ_CORS_ORIGINS` to a comma-separated list of exact production origin
 
 ## Authentication and production security boundary
 
-The frontend uses Supabase Auth. Supabase RLS protects workspace database records and private source-file storage. The FastAPI endpoints described above are currently stateless and do not validate Supabase access tokens; they do not directly read or write private workspace records.
+All processing endpoints (`/api/v1/sales/validate`, `/api/v1/forecasts`, `/api/v1/inventory/template` and `/api/v1/inventory/recommendations`) require an HTTP Bearer token from a signed-in Supabase session. The API validates each token by calling the configured Supabase Auth `/auth/v1/user` endpoint with the project URL and publishable key. Invalid or missing tokens receive HTTP 401. Missing configuration or an unavailable Auth service fails closed with HTTP 503. The lightweight root and health endpoints remain public for service health checks.
 
-Before exposing the API publicly in production, Stage 6 must decide and verify appropriate abuse controls (including request/rate limits and hosting-level protections) and document the trust boundary. CORS is a browser policy, not API authentication. Never place Supabase service-role credentials in the frontend or commit secrets.
+Configure these backend environment variables:
+
+- `SUPABASE_URL`: the existing Supabase project URL.
+- `SUPABASE_PUBLISHABLE_KEY`: the project's publishable key (legacy anon key is also accepted by Supabase where applicable).
+- `DEMANDIQ_CORS_ORIGINS`: comma-separated exact browser origins, for example `https://your-app.vercel.app`.
+
+The backend does not need or use a Supabase service-role key. Never put one in the frontend, backend deployment environment for this authentication flow, or Git repository. The API remains stateless and does not directly read/write workspace records; Supabase RLS continues to protect browser-side workspace data.
+
+CORS is a browser policy, not authentication. The in-process limiter is not distributed protection. A production host or edge proxy must additionally enforce distributed rate limits, total request-body size limits (including multipart overhead), connection/time limits and concurrency controls. The Render blueprint in the repository proposes a conservative per-process starting limit and has automatic deployment disabled.
 
 ## Tests
 

@@ -23,6 +23,14 @@ export type ForecastResult = {
     history_end: string;
     forecast_start: string;
     forecast_end: string;
+    total_series_count?: number;
+    excluded_series_count?: number;
+    excluded_series?: Array<{
+      store: string | number;
+      item: string | number;
+      last_date: string;
+      reason: string;
+    }>;
   };
   quality_report: {
     rows_received: number;
@@ -38,9 +46,22 @@ export type ForecastResult = {
   forecast: ForecastRow[];
 };
 
+import { supabase } from "./supabase";
+
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
 ).replace(/\/$/, "");
+
+async function authenticatedFetch(url: string, init: RequestInit): Promise<Response> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw new Error("Unable to verify your sign-in session. Please sign in again.");
+  const accessToken = data.session?.access_token;
+  if (!accessToken) throw new Error("Please sign in before using forecasting or inventory tools.");
+
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${accessToken}`);
+  return fetch(url, { ...init, headers });
+}
 
 async function readApiError(response: Response): Promise<string> {
   try {
@@ -87,7 +108,7 @@ export async function generateForecast(
   formData.append("file", file);
   formData.append("horizon_days", String(horizonDays));
 
-  const response = await fetch(`${API_BASE_URL}/api/v1/forecasts`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/v1/forecasts`, {
     method: "POST",
     body: formData,
   });
@@ -131,6 +152,15 @@ export type InventoryResult = {
     forecast_rows: number;
     forecast_start: string;
     forecast_end: string;
+    excluded_forecast_rows?: number;
+    forecast_total_series_count?: number;
+    forecast_excluded_series_count?: number;
+    forecast_excluded_series?: Array<{
+      store: string | number;
+      item: string | number;
+      last_date: string;
+      reason: string;
+    }>;
   };
   recommendations: InventoryRecommendation[];
 };
@@ -138,7 +168,7 @@ export type InventoryResult = {
 export async function downloadInventoryTemplate(salesFile: File): Promise<Blob> {
   const formData = new FormData();
   formData.append("sales_file", salesFile);
-  const response = await fetch(`${API_BASE_URL}/api/v1/inventory/template`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/v1/inventory/template`, {
     method: "POST",
     body: formData,
   });
@@ -157,7 +187,7 @@ export async function generateInventoryRecommendations(
   formData.append("lookback_days", "28");
   formData.append("service_level_z", "1.65");
   formData.append("forecast_horizon_days", String(forecastHorizonDays));
-  const response = await fetch(`${API_BASE_URL}/api/v1/inventory/recommendations`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/v1/inventory/recommendations`, {
     method: "POST",
     body: formData,
   });
@@ -204,7 +234,7 @@ export async function validateSalesCsv(
   const formData = new FormData();
   formData.append("file", file);
   const query = includeRecords ? "?include_records=true" : "";
-  const response = await fetch(`${API_BASE_URL}/api/v1/sales/validate${query}`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/api/v1/sales/validate${query}`, {
     method: "POST",
     body: formData,
   });

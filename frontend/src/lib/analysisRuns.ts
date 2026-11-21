@@ -48,6 +48,8 @@ export async function saveForecastAnalysis(
       summary: {
         model: result.model,
         series_count: result.metadata.series_count,
+        total_series_count: result.metadata.total_series_count ?? result.metadata.series_count,
+        excluded_series_count: result.metadata.excluded_series_count ?? 0,
         forecast_rows: result.metadata.forecast_rows,
         history_end: result.metadata.history_end,
         forecast_start: result.metadata.forecast_start,
@@ -83,6 +85,8 @@ export async function saveInventoryAnalysis(
         complete_recommendations: result.metadata.complete_recommendations,
         reorder_required: result.recommendations.filter((row) => row.reorder_required).length,
         forecast_rows: result.metadata.forecast_rows,
+        excluded_forecast_rows: result.metadata.excluded_forecast_rows ?? 0,
+        forecast_excluded_series_count: result.metadata.forecast_excluded_series_count ?? 0,
         demand_basis: result.demand_basis,
       },
       result,
