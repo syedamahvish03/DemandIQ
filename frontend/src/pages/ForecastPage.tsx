@@ -152,9 +152,26 @@ export default function ForecastPage() {
             </div>
             <div className="forecast-stats">
               <div><small>FORECAST PERIOD</small><strong>{result.metadata.horizon_days} days</strong></div>
-              <div><small>PRODUCT SERIES</small><strong>{result.metadata.series_count.toLocaleString()}</strong></div>
+              <div><small>ELIGIBLE SERIES</small><strong>{result.metadata.series_count.toLocaleString()}</strong></div>
               <div><small>FORECAST ROWS</small><strong>{result.metadata.forecast_rows.toLocaleString()}</strong></div>
               <div><small>HISTORY THROUGH</small><strong>{result.metadata.history_end}</strong></div>
+            </div>
+            <div className="forecast-quality">
+              <b>Forecast date range</b>
+              <span>{result.metadata.forecast_start} to {result.metadata.forecast_end}. These dates are calculated from the latest date in the uploaded sales history, not from today's calendar date.</span>
+              {(result.metadata.excluded_series_count ?? 0) > 0 && (
+                <>
+                  <p>{result.metadata.excluded_series_count} of {result.metadata.total_series_count} store-item series were excluded because their sales history does not reach {result.metadata.history_end}. No missing sales were fabricated.</p>
+                  <details>
+                    <summary>View excluded store-item series</summary>
+                    <ul>
+                      {(result.metadata.excluded_series ?? []).map((series) => (
+                        <li key={`${series.store}-${series.item}`}>Store {series.store}, item {series.item} — last observed {series.last_date}</li>
+                      ))}
+                    </ul>
+                  </details>
+                </>
+              )}
             </div>
             <ForecastTrend rows={result.forecast} />
             <div className="forecast-quality">
