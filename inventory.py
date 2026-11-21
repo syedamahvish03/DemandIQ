@@ -65,13 +65,7 @@ def calculate_inventory_recommendations(
     complete = stock.loc[complete_mask].copy()
     excluded_rows = int((~complete_mask).sum())
     if complete.empty:
-        return pd.DataFrame(), {
-            "excluded_input_rows": excluded_rows,
-            "excluded_forecast_rows": 0,
-            "lookback_days": lookback_days,
-            "complete_recommendations": 0,
-            "demand_basis": "future_forecast" if demand_forecast is not None else "historical_average",
-        }
+        return pd.DataFrame(), {"excluded_input_rows": excluded_rows, "lookback_days": lookback_days}
 
     nonnegative_columns = ["on_hand", "on_order", "backorders", "lead_time_days", "review_period_days"]
     if not np.isfinite(complete[numeric_columns].to_numpy(dtype=float)).all():
@@ -107,10 +101,7 @@ def calculate_inventory_recommendations(
     if result.empty:
         return pd.DataFrame(), {
             "excluded_input_rows": excluded_rows + len(complete),
-            "excluded_forecast_rows": 0,
             "lookback_days": lookback_days,
-            "complete_recommendations": 0,
-            "demand_basis": "future_forecast" if demand_forecast is not None else "historical_average",
         }
 
     result["safety_stock"] = (
@@ -152,29 +143,14 @@ def calculate_inventory_recommendations(
             key: group["forecast_sales"].to_numpy(dtype=float)
             for key, group in forecast.groupby(["store", "item"], sort=False)
         }
-        forecast_key_index = pd.MultiIndex.from_tuples(
-            list(forecast_groups.keys()), names=["store", "item"]
-        )
-        complete_key_index = pd.MultiIndex.from_frame(complete[["store", "item"]])
-        excluded_forecast_rows = int((~complete_key_index.isin(forecast_key_index)).sum())
-
-        result_key_index = pd.MultiIndex.from_frame(result[["store", "item"]])
-        result = result.loc[result_key_index.isin(forecast_key_index)].copy()
-        if result.empty:
-            return pd.DataFrame(), {
-                "excluded_input_rows": excluded_rows,
-                "excluded_forecast_rows": excluded_forecast_rows,
-                "lookback_days": lookback_days,
-                "demand_window_start": start_date.date(),
-                "demand_window_end": end_date.date(),
-                "complete_recommendations": 0,
-                "demand_basis": "future_forecast",
-            }
-
         lead_demands = []
         protection_demands = []
         for row in result.itertuples(index=False):
             key = (row.store, row.item)
+            if key not in forecast_groups:
+                raise ValueError(
+                    f"No future demand forecast is available for store {row.store}, item {row.item}."
+                )
             values = forecast_groups[key]
             lead_days = int(row.lead_time_days)
             protection_days = lead_days + int(row.review_period_days)
@@ -230,9 +206,6 @@ def calculate_inventory_recommendations(
     ).reset_index(drop=True)
     metadata = {
         "excluded_input_rows": excluded_rows,
-        "excluded_forecast_rows": (
-            excluded_forecast_rows if demand_forecast is not None else 0
-        ),
         "lookback_days": lookback_days,
         "demand_window_start": start_date.date(),
         "demand_window_end": end_date.date(),
