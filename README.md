@@ -6,7 +6,7 @@ DemandIQ is a retail-planning application that combines historical sales analysi
 
 ## Product status
 
-The React + FastAPI product is implemented and committed on the repository's `main` branch. The application source and Vercel/Render deployment configuration are present in GitHub and ready to be connected to the hosting providers. Stages 0–6 implementation and automated verification are complete. Hosting connection, production environment configuration and deployment are still separate steps. A public production launch also requires hosting-specific API access controls, abuse protection, a verified backup/restore plan and live deployment checks.
+The React + FastAPI product is implemented and committed on the repository's `main` branch. The application source and Render-only deployment configuration are being prepared on a dedicated deployment branch. The approved initial hosting target is a Render static frontend and Render Free FastAPI backend, with the existing Supabase Free project retained for Auth, PostgreSQL, RLS and private Storage. Stages 0–6 implementation and automated verification are complete. Hosting connection, production environment configuration and deployment are still separate steps. A public production launch also requires hosting-specific API access controls, abuse protection, a verified backup/restore plan and live deployment checks.
 
 The original Streamlit application remains in the repository as the reference MVP.
 
@@ -165,4 +165,4 @@ GitHub Actions runs Python tests, the Streamlit syntax check and the frontend pr
 
 ## Documentation
 
-See `docs/PRODUCT_ARCHITECTURE.md` for the roadmap, `docs/RELEASE_READINESS.md` for the Stage 6 verification checklist, `docs/DEPLOYMENT.md` for the Vercel/Render/Supabase deployment handoff, and `backend/README.md` for API endpoint details.
+See `docs/PRODUCT_ARCHITECTURE.md` for the roadmap, `docs/RELEASE_READINESS.md` for the Stage 6 verification checklist, `docs/DEPLOYMENT.md` for the Render/Supabase deployment handoff, and `backend/README.md` for API endpoint details.
