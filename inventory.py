@@ -65,7 +65,13 @@ def calculate_inventory_recommendations(
     complete = stock.loc[complete_mask].copy()
     excluded_rows = int((~complete_mask).sum())
     if complete.empty:
-        return pd.DataFrame(), {"excluded_input_rows": excluded_rows, "lookback_days": lookback_days}
+        return pd.DataFrame(), {
+            "excluded_input_rows": excluded_rows,
+            "excluded_forecast_rows": 0,
+            "lookback_days": lookback_days,
+            "complete_recommendations": 0,
+            "demand_basis": "future_forecast" if demand_forecast is not None else "historical_average",
+        }
 
     nonnegative_columns = ["on_hand", "on_order", "backorders", "lead_time_days", "review_period_days"]
     if not np.isfinite(complete[numeric_columns].to_numpy(dtype=float)).all():
@@ -101,7 +107,10 @@ def calculate_inventory_recommendations(
     if result.empty:
         return pd.DataFrame(), {
             "excluded_input_rows": excluded_rows + len(complete),
+            "excluded_forecast_rows": 0,
             "lookback_days": lookback_days,
+            "complete_recommendations": 0,
+            "demand_basis": "future_forecast" if demand_forecast is not None else "historical_average",
         }
 
     result["safety_stock"] = (
