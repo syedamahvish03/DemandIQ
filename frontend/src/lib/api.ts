@@ -23,6 +23,14 @@ export type ForecastResult = {
     history_end: string;
     forecast_start: string;
     forecast_end: string;
+    total_series_count?: number;
+    excluded_series_count?: number;
+    excluded_series?: Array<{
+      store: string | number;
+      item: string | number;
+      last_date: string;
+      reason: string;
+    }>;
   };
   quality_report: {
     rows_received: number;
@@ -144,6 +152,15 @@ export type InventoryResult = {
     forecast_rows: number;
     forecast_start: string;
     forecast_end: string;
+    excluded_forecast_rows?: number;
+    forecast_total_series_count?: number;
+    forecast_excluded_series_count?: number;
+    forecast_excluded_series?: Array<{
+      store: string | number;
+      item: string | number;
+      last_date: string;
+      reason: string;
+    }>;
   };
   recommendations: InventoryRecommendation[];
 };
