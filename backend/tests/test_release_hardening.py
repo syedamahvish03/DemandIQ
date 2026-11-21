@@ -263,3 +263,39 @@ def test_forecast_unexpected_error_returns_generic_message_without_exception_det
     )
     assert "private-row-secret" not in response.text
     assert "Traceback" not in response.text
+
+
+
+def test_inventory_recommendations_enforce_aggregate_multipart_request_limit(monkeypatch):
+    # Each CSV is below the existing per-file limit, but the multipart request
+    # exceeds this deliberately small aggregate limit.
+    monkeypatch.setattr(api_module, "MAX_REQUEST_BODY_BYTES", 1024)
+    response = client.post(
+        "/api/v1/inventory/recommendations",
+        files={
+            "sales_file": ("sales.csv", b"s" * 600, "text/csv"),
+            "inventory_file": ("inventory.csv", b"i" * 600, "text/csv"),
+        },
+    )
+
+    assert response.status_code == 413
+    assert "total upload request" in response.json()["detail"].lower()
+
+
+def test_inventory_recommendations_allow_request_within_aggregate_limit(monkeypatch):
+    monkeypatch.setattr(api_module, "MAX_REQUEST_BODY_BYTES", 4096)
+    response = client.post(
+        "/api/v1/inventory/recommendations",
+        files={
+            "sales_file": ("sales.csv", b"store,item,date,sales\nA,SKU1,2025-01-01,1\n", "text/csv"),
+            "inventory_file": (
+                "inventory.csv",
+                b"store,item,on_hand,on_order,backorders,lead_time_days,review_period_days\nA,SKU1,10,0,0,3,7\n",
+                "text/csv",
+            ),
+        },
+    )
+
+    # The aggregate body limit must not reject a normal small request.
+    # It proceeds to CSV validation, which may reject the intentionally short history.
+    assert response.status_code in (200, 422)
