@@ -405,14 +405,31 @@ async def create_inventory_recommendations(
     try:
         forecast_metadata = None
         demand_forecast = None
+        inventory_inputs = inventory_frame.loc[:, list(INVENTORY_COLUMNS)].copy()
+        excluded_forecast_rows = 0
         if forecast_horizon_days is not None:
             demand_forecast, forecast_metadata = forecast_future_demand(
                 cleaned_sales,
                 horizon_days=forecast_horizon_days,
             )
+            forecast_pairs = pd.MultiIndex.from_frame(
+                demand_forecast[["store", "item"]].drop_duplicates()
+            )
+            numeric_inventory = inventory_inputs.loc[:, list(INVENTORY_COLUMNS[2:])].apply(
+                pd.to_numeric, errors="coerce"
+            )
+            complete_stock_mask = numeric_inventory.notna().all(axis=1)
+            inventory_pairs = pd.MultiIndex.from_frame(
+                inventory_inputs[["store", "item"]]
+            )
+            has_forecast_mask = inventory_pairs.isin(forecast_pairs)
+            excluded_forecast_mask = complete_stock_mask & ~has_forecast_mask
+            excluded_forecast_rows = int(excluded_forecast_mask.sum())
+            inventory_inputs = inventory_inputs.loc[~excluded_forecast_mask].copy()
+
         recommendations, metadata = calculate_inventory_recommendations(
             cleaned_sales,
-            inventory_frame.loc[:, list(INVENTORY_COLUMNS)],
+            inventory_inputs,
             lookback_days=lookback_days,
             service_level_z=service_level_z,
             demand_forecast=demand_forecast,
@@ -433,6 +450,7 @@ async def create_inventory_recommendations(
     records = recommendations.astype(object).where(pd.notna(recommendations), None).to_dict(orient="records")
     response_metadata = dict(metadata)
     if forecast_metadata is not None:
+        response_metadata["excluded_forecast_rows"] = excluded_forecast_rows
         response_metadata.update({
             "forecast_horizon_days": forecast_metadata["horizon_days"],
             "forecast_rows": forecast_metadata["forecast_rows"],
